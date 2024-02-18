@@ -14,14 +14,17 @@ class HTRtrainer(object):
 
 
         self.optimizer.zero_grad()
-        print(imgs)
+        print(imgs.shape)
 
         y_pred = self.htr_model(imgs)
         y_log_pred = torch.log(y_pred)
         print(y_log_pred.shape)
         print(gt_label.shape)
 
-        ctc = self.loss(y_log_pred, gt_label)
+        input_lengths = torch.full(size=(y_log_pred.shape[0],), fill_value=y_log_pred.shape[1], dtype=torch.long)
+        target_lengths = torch.full(size=(gt_label.shape[0], ), fill_value=torch.count_nonzero(gt_label, dim=1), dtype=torch.long)
+
+        ctc = self.loss(y_log_pred, gt_label, input_lengths, target_lengths)
         print(ctc)
         return ctc
 
