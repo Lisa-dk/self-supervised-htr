@@ -3,3 +3,4 @@ raw/
 network/ganrec/
 src/data/__pycache__/
 network/__pycache__/
+src/__pycache__
