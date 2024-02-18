@@ -1,0 +1,5 @@
+raw/
+/data/
+network/ganrec/
+src/data/__pycache__/
+network/__pycache__/
