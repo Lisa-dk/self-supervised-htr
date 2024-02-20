@@ -66,7 +66,8 @@ class RIMES_data(D.Dataset):
         img = 1. - (img / 255.) # 0-255 -> 0-1
 
         m, s = 0.5, 0.5
-        return (img - m) / s
+        img = (img - m) / s
+        return img.astype('float32')
 
     
     def copy_style_imgs(self, single_imgs):
@@ -94,14 +95,14 @@ class RIMES_data(D.Dataset):
         img_path, label = self.img_paths[idx]
 
         img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
-        print(img.shape, img_path)
+        
 
         img = self.normalize(img)
         # gen_input = self.copy_style_imgs(img)
 
         label = self.tokenizer.encode(label)
         
-        return img, label
+        return np.expand_dims(img, axis=0), np.asarray(label)
     
     def __len__(self):
         return len(self.img_paths)

@@ -5,17 +5,21 @@ import numpy as np
 class Tokenizer():
     """Manager tokens functions and charset/dictionary properties"""
 
-    def __init__(self, chars, max_text_length=10):
+    def __init__(self, chars, max_text_length=10, self_supervised=True):
         self.PAD_TK, self.UNK_TK = "¶", "¤"
         self.GO_TK, self.END_TK = "♂", "♀"
-        self.chars = (self.GO_TK + self.GO_TK + self.PAD_TK + self.UNK_TK + chars)
-        # print(self.chars)
+        if not self_supervised:
+            self.BLAN_TK = '#'
+            self.chars = (self.GO_TK + self.END_TK + self.PAD_TK + self.UNK_TK + chars + self.BLAN_TK)
+            self.BLANK = self.chars.find(self.BLAN_TK)
+        else:
+            self.chars = (self.GO_TK + self.END_TK + self.PAD_TK + self.UNK_TK + chars)
 
         self.PAD = self.chars.find(self.PAD_TK)
         self.UNK = self.chars.find(self.UNK_TK)
         self.GO = self.chars.find(self.GO_TK)
         self.END = self.chars.find(self.END_TK)
-
+        
         self.vocab_size = len(self.chars)
         self.maxlen = max_text_length + 2
 
@@ -30,7 +34,7 @@ class Tokenizer():
 
         # groups = ["".join(group) for _, group in groupby(text)]
         # text = "".join([self.UNK_TK.join(list(x)) if len(x) > 1 else x for x in groups])
-        text = self.GO_TK + text + self.GO_TK
+        text = self.GO_TK + text + self.END_TK
         encoded = []
 
         for item in text:
@@ -44,6 +48,7 @@ class Tokenizer():
 
     def decode(self, text):
         """Decode vector to text"""
+
 
         decoded = "".join([self.chars[int(x)] for x in text if x > -1])
         decoded = self.remove_tokens(decoded)

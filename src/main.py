@@ -34,6 +34,7 @@ if __name__ == "__main__":
     dataset_path = os.path.join("..", "data", args.dataset, "words")
 
     if args.preproc:
+        print("Preparing data...")
         path_from = os.path.join("..", "raw", args.dataset, "words")
         os.makedirs(dataset_path, exist_ok=True)
         preproc_rimes(path_from, dataset_path)
@@ -64,8 +65,11 @@ if __name__ == "__main__":
         htr_model = Puigcerver(input_size=input_size, d_model=tokenizer.vocab_size)
         optimizer = torch.optim.RMSprop(htr_model.parameters(), lr=0.0003, momentum=0.9)
 
-        trainer = HTRtrainer(htr_model, optimizer=optimizer)
-        trainer.train_model(train_loader=train_loader, valid_loader=valid_loader, epochs=(0, 5))
+        trainer = HTRtrainer(htr_model, optimizer=optimizer, device=device, tokenizer=tokenizer, loss_name="ctc", self_supervised=0)
+        trainer.train_model(train_loader=train_loader, valid_loader=valid_loader, epochs=(0, 10))
+
+    if args.test:
+        pass
 
 
 
