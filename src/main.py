@@ -28,7 +28,7 @@ if __name__ == "__main__":
     parser.add_argument('--start_epoch', type=int, default=0)
 
     parser.add_argument("--batch_size", type=int, default=16)
-    parser.add_argument("--loss", type=str, default="")
+    parser.add_argument("--loss", type=str, default="ctc")
     args = parser.parse_args()
 
     dataset_path = os.path.join("..", "data", args.dataset, "words")
@@ -48,8 +48,12 @@ if __name__ == "__main__":
 
     charset_base = string.ascii_lowercase + string.ascii_uppercase
     max_text_length = 25
-    tokenizer = Tokenizer(chars=charset_base, max_text_length=max_text_length)
+    tokenizer = Tokenizer(chars=charset_base, max_text_length=max_text_length, self_supervised=args.self_supervised)
 
+    num_classes = len(charset_base)
+    tokens = {'GO_TOKEN': tokenizer.GO, 'PAD_TOKEN': tokenizer.PAD, 'UNK_TOKEN': tokenizer.UNK, "END_TOKEN":tokenizer.END}
+    num_tokens = len(tokens.keys())
+    vocab_size = num_classes + num_tokens
     
     data_train, data_valid, data_test = read_rimes(dataset_path)
 
@@ -57,15 +61,21 @@ if __name__ == "__main__":
     data_valid = RIMES_data(data_valid, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs)
     data_test = RIMES_data(data_test, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs)
 
-    train_loader = torch.utils.data.DataLoader(data_train, batch_size=args.batch_size, shuffle=True)
-    valid_loader = torch.utils.data.DataLoader(data_valid, batch_size=args.batch_size, shuffle=False)
-    test_loader = torch.utils.data.DataLoader(data_test, batch_size=args.batch_size, shuffle=False)
+    train_loader = torch.utils.data.DataLoader(data_train, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=4)
+    valid_loader = torch.utils.data.DataLoader(data_valid, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
+    test_loader = torch.utils.data.DataLoader(data_test, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
 
     if args.train:
         htr_model = Puigcerver(input_size=input_size, d_model=tokenizer.vocab_size)
-        optimizer = torch.optim.RMSprop(htr_model.parameters(), lr=0.0003, momentum=0.9)
+        if os.path.exists('./htr_model.model'):
+            htr_model.load_state_dict(torch.load('./htr_model.model')) #load
 
-        trainer = HTRtrainer(htr_model, optimizer=optimizer, device=device, tokenizer=tokenizer, loss_name="ctc", self_supervised=0)
+        
+        optimizer = torch.optim.RMSprop(htr_model.parameters(), lr=0.003, momentum=0.9)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 20, 0.1)
+        
+
+        trainer = HTRtrainer(htr_model, optimizer=optimizer, lr_scheduler=scheduler, device=device, tokenizer=tokenizer, loss_name=args.loss, self_supervised=args.self_supervised)
         trainer.train_model(train_loader=train_loader, valid_loader=valid_loader, epochs=(0, 10))
 
     if args.test:

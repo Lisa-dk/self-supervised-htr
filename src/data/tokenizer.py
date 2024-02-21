@@ -59,4 +59,4 @@ class Tokenizer():
     def remove_tokens(self, text):
         """Remove tokens (PAD) from text"""
 
-        return text.replace(self.PAD_TK, "").replace(self.UNK_TK, "").replace(self.GO_TK, "").replace(self.END_TK, "")
+        return text.replace(self.PAD_TK, "").replace(self.UNK_TK, "").replace(self.GO_TK, "").replace(self.END_TK, "").replace(self.BLAN_TK, "")

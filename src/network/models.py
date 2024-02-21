@@ -34,29 +34,29 @@ class Puigcerver(nn.Module):
         print(input_size, d_model)
 
         self.cnn = nn.Sequential(
-            nn.Conv2d(in_channels=input_size[2], out_channels=16, kernel_size=(3, 3), stride=(1, 1), padding="same"),
+            nn.Conv2d(in_channels=input_size[2], out_channels=16, kernel_size=(3, 3), stride=(1, 1), padding="same", bias=False),
             nn.BatchNorm2d(16),
             nn.LeakyReLU(negative_slope=0.01),
             nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2)),
 
-            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=(3, 3), stride=(1, 1), padding="same"),
+            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=(3, 3), stride=(1, 1), padding="same", bias=False),
             nn.BatchNorm2d(32),
             nn.LeakyReLU(negative_slope=0.01),
             nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2)),
 
             nn.Dropout(p=0.2),
-            nn.Conv2d(in_channels=32, out_channels=48, kernel_size=(3, 3), stride=(1, 1), padding="same"),
+            nn.Conv2d(in_channels=32, out_channels=48, kernel_size=(3, 3), stride=(1, 1), padding="same", bias=False),
             nn.BatchNorm2d(48),
             nn.LeakyReLU(negative_slope=0.01),
             nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2)),
 
             nn.Dropout(p=0.2),
-            nn.Conv2d(in_channels=48, out_channels=64, kernel_size=(3, 3), stride=(1, 1), padding="same"),
+            nn.Conv2d(in_channels=48, out_channels=64, kernel_size=(3, 3), stride=(1, 1), padding="same", bias=False),
             nn.BatchNorm2d(64),
             nn.LeakyReLU(negative_slope=0.01),
 
             nn.Dropout(p=0.2),
-            nn.Conv2d(in_channels=64, out_channels=80, kernel_size=(3, 3), stride=(1, 1), padding="same"),
+            nn.Conv2d(in_channels=64, out_channels=80, kernel_size=(3, 3), stride=(1, 1), padding="same", bias=False),
             nn.BatchNorm2d(80),
             nn.LeakyReLU(negative_slope=0.01)
         )
@@ -83,3 +83,51 @@ class Puigcerver(nn.Module):
         # print(x.shape)
         # x = self.softmax(x)
         return x
+
+# def calculate_padding(input_size, kernel_size, stride):
+#     padding_height = max(0, ((input_size[2] - 1) * stride[0] + kernel_size[0] - input_size[2]) // 2)
+#     padding_width = max(0, ((input_size[3] - 1) * stride[1] + kernel_size[1] - input_size[3]) // 2)
+#     return (padding_height, padding_width)
+
+    
+# class Flor(nn.Module):
+#     def __init__(self, input_size, d_model):
+#         super(Flor, self).__init__()
+#         print(input_size, d_model)
+
+#         self.b1 = nn.Sequential(
+#             nn.Conv2d(in_channels=input_size[2], out_channels=16, kernel_size=(3, 3), stride=(2, 2), padding=(32, 32)),
+#             nn.PReLU(16),
+#             nn.BatchNorm2d(16), # in paper renormalization
+#             FullGatedConv2D(in_channels=16, out_channels=16, kernel_size=(3,3), padding="same"),
+#         )
+
+#         self.b2 = nn.Sequential(
+#             nn.Conv2d(in_channels=input_size[2], out_channels=32, kernel_size=(3, 3), stride=(1, 1), padding="same"),
+#             nn.PReLU(32),
+#             nn.BatchNorm2d(32), # in paper renormalization
+#             FullGatedConv2D(in_channels=32, out_channels=32, kernel_size=(3,3), padding="same"),
+#         )
+
+#         self.b3 = nn.Sequential(
+#             nn.Conv2d(in_channels=input_size[2], out_channels=40, kernel_size=(3, 3), stride=(1, 1), padding="same"),
+#             nn.PReLU(40),
+#             nn.BatchNorm2d(40), # in paper renormalization
+#             FullGatedConv2D(in_channels=40, out_channels=40, kernel_size=(3,3), padding="same"),
+#         )
+
+
+
+# class FullGatedConv2D(nn.Module):
+#     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True):
+#         super(FullGatedConv2D, self).__init__()
+#         self.conv = nn.Conv2d(in_channels, out_channels * 2, kernel_size, stride=stride, padding=padding, dilation=dilation, groups=groups, bias=bias)
+#         self.out_channels = out_channels
+
+#     def forward(self, inputs):
+#         output = self.conv(inputs)
+#         linear = output[:, :self.out_channels, :, :]
+#         sigmoid = torch.sigmoid(output[:, self.out_channels:, :, :])
+#         return linear * sigmoid
+
+    

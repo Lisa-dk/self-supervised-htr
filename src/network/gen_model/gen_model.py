@@ -1,8 +1,8 @@
 import numpy as np
 import os
 import torch
-from vgg_tro_channel3_modi import vgg19_bn
-from blocks import LinearBlock, Conv2dBlock, ResBlocks, ActFirstResBlock
+from network.gen_model.vgg_tro_channel3_modi import vgg19_bn
+from network.gen_model.blocks import LinearBlock, Conv2dBlock, ResBlocks, ActFirstResBlock
 from torch import nn
 import torch.nn.functional as Fun
 
@@ -11,7 +11,7 @@ gpu = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 class GenModel_FC(nn.Module):
     def __init__(self, text_max_len, vocab_size, pad_token):
         super(GenModel_FC, self).__init__()
-        self.enc_image = ImageEncoder().to(gpu)
+        self.enc_image = torch.jit.script(ImageEncoder()).to(gpu)
         self.enc_text = TextEncoder_FC(text_max_len, vocab_size, pad_token).to(gpu)
         self.dec = Decoder().to(gpu)
         self.linear_mix = nn.Linear(1024, 512)
@@ -41,7 +41,6 @@ class GenModel_FC(nn.Module):
         return ff.permute(0, 3, 1, 2)
     
     def forward(self, image_input, text_input):
-        print("entered forward generator")
         f_xs = self.enc_image(image_input) # b,512,8,27
         f_xt, f_embed = self.enc_text(text_input, f_xs.shape) # b,4096  b,512,8,27
         f_mix = self.mix(f_xs, f_embed)

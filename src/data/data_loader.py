@@ -70,26 +70,16 @@ class RIMES_data(D.Dataset):
         return img.astype('float32')
 
     
-    def copy_style_imgs(self, single_imgs):
-        idx = 0
-        final_imgs = []
+    def copy_style_imgs(self, single_img):
+        final_img = [single_img[:]]
 
-        for idx in range(len(single_imgs)):
-            imgs = list()
-            img = single_imgs[idx]
-            imgs.append(img)
+        while len(final_img) < self.num_images:
+            num_cp = self.num_images - len(final_img)
+            final_img = final_img + final_img[:num_cp]
 
-            final_img = imgs
+        final_img = np.stack(final_img, axis=0)
 
-            while len(final_img) < self.num_images:
-                num_cp = self.num_images - len(final_img)
-                final_img = final_img + imgs[:num_cp]
-
-            final_img = np.stack(final_img, axis=0)
-            final_imgs.append(final_img)
-            idx += 1
-
-        return np.asarray(final_imgs)
+        return np.asarray(final_img, dtype="float32")
     
     def __getitem__(self, idx):
         img_path, label = self.img_paths[idx]
@@ -98,11 +88,11 @@ class RIMES_data(D.Dataset):
         
 
         img = self.normalize(img)
-        # gen_input = self.copy_style_imgs(img)
+        gen_input = self.copy_style_imgs(img)
 
         label = self.tokenizer.encode(label)
         
-        return np.expand_dims(img, axis=0), np.asarray(label)
+        return gen_input, np.asarray(label)
     
     def __len__(self):
         return len(self.img_paths)
