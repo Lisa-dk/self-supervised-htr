@@ -75,8 +75,8 @@ if __name__ == "__main__":
             htr_model.load_state_dict(torch.load('./htr_model.model')) #load
 
         
-        optimizer = torch.optim.RMSprop(htr_model.parameters(), lr=0.003, momentum=0.9)
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 20, 0.1)
+        optimizer = torch.optim.RMSprop(htr_model.parameters(), lr=0.001, momentum=0.9)
+        scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, 1.0, 0.3)
         
 
         trainer = HTRtrainer(htr_model, optimizer=optimizer, lr_scheduler=scheduler, device=device, tokenizer=tokenizer, loss_name=args.loss, self_supervised=args.self_supervised)
