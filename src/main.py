@@ -67,7 +67,11 @@ if __name__ == "__main__":
 
     if args.train:
         htr_model = Puigcerver(input_size=input_size, d_model=tokenizer.vocab_size)
-        if os.path.exists('./htr_model.model'):
+        if args.self_supervised:
+            model_name = './htr_model_self_supervised.model'
+        else:
+            model_name = './htr_model_supervised.model'
+        if os.path.exists(model_name):
             htr_model.load_state_dict(torch.load('./htr_model.model')) #load
 
         

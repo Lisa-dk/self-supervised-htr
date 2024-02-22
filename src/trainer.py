@@ -6,6 +6,8 @@ import editdistance
 from network.losses import Loss
 import matplotlib.pyplot as plt
 import os
+from loss_saver import LossSaver
+from network.gen_model.gen_model import GenModel_FC
 
 
 class HTRtrainer(object):
@@ -15,11 +17,24 @@ class HTRtrainer(object):
         self.optimizer = optimizer
         self.scheduler = lr_scheduler
 
-        self.loss = Loss(loss_name, self_supervised, tokenizer, device)
+        self.loss_name = loss_name
+        self.loss = Loss(loss_name, tokenizer, device)
         
         self.device = device
         self.max_text_length = tokenizer.maxlen
         self.tokenizer = tokenizer
+
+        if self_supervised:
+            self.gen_model = GenModel_FC(tokenizer.maxlen, tokenizer.vocab_size, tokenizer.PAD)
+            self.gen_model.load_state_dict(torch.load('./network/gen_model/gen_model.model')) #load
+            self.gen_model.eval()
+            self.gen_model.to(self.device)
+            self.mode = "self_supervised"
+        else:
+            self.mode = "supervised"
+        
+        self.train_batch = getattr(self, f"train_batch_{self.mode}")
+        self.validate = getattr(self, f"validate_{self.mode}")
 
     def save_images(self, epoch, pred_imgs, true_imgs, pred_labels, labels, plot=False):
         dir_path = './results/imgs/'
@@ -37,7 +52,6 @@ class HTRtrainer(object):
             plt.savefig(dir_path +  str(labels[idx]) + 'images_at_epoch_{:04d}.png'.format(epoch))
             plt.show()
             plt.close()
-
 
         
     def evaluate(self, y_pred, gt_labels, show=False):
@@ -59,7 +73,7 @@ class HTRtrainer(object):
                 return cer/ len(gt_labels), wer/ len(gt_labels), y_pred, gt_labels
         return cer/ len(gt_labels), wer/ len(gt_labels)
     
-    def validate(self, batch):
+    def validate_self_supervised(self, batch):
         self.htr_model.eval()
         with torch.no_grad():
             imgs, gt_labels = batch
@@ -68,16 +82,35 @@ class HTRtrainer(object):
             gt_labels = gt_labels.to(self.device)
 
             y_pred = self.htr_model(imgs[:,0,:,:].unsqueeze(1))
-            loss = self.loss.loss_func(y_pred, imgs)
+            synth_imgs = self.gen_model(imgs, y_pred)
+            loss = self.loss.loss_func(synth_imgs, imgs)
 
             y_pred_soft = torch.nn.functional.softmax(y_pred, dim=2).detach()
             y_pred_max = torch.max(y_pred_soft, dim=2).indices
             gt_labels = gt_labels.detach()
             cer, wer, y_pred, y_true = self.evaluate(y_pred_max, gt_labels, show=True)
 
-        return loss, cer, wer, y_pred, y_true, #imgs[:,0,:,:], synth_imgs
+        return loss.detach().cpu(), cer, wer, y_pred, y_true, #imgs[:,0,:,:], synth_imgs
+
+    def validate_supervised(self, batch):
+        self.htr_model.eval()
+        with torch.no_grad():
+            imgs, gt_labels = batch
+
+            imgs = imgs.to(self.device)
+            gt_labels = gt_labels.to(self.device)
+
+            y_pred = self.htr_model(imgs[:,0,:,:].unsqueeze(1))
+            loss = self.loss.loss_func(y_pred, gt_labels)
+
+            y_pred_soft = torch.nn.functional.softmax(y_pred, dim=2).detach()
+            y_pred_max = torch.max(y_pred_soft, dim=2).indices
+            gt_labels = gt_labels.detach()
+            cer, wer, y_pred, y_true = self.evaluate(y_pred_max, gt_labels, show=True)
+
+        return loss.detach().cpu(), cer, wer, y_pred, y_true, #imgs[:,0,:,:], synth_imgs
     
-    def train_batch(self, batch):
+    def train_batch_self_supervised(self, batch):
         self.htr_model.train()
         imgs, gt_labels = batch
 
@@ -87,18 +120,10 @@ class HTRtrainer(object):
         self.optimizer.zero_grad(set_to_none=True)
 
         y_pred = self.htr_model(imgs[:,0,:,:].unsqueeze(1))
-        loss = self.loss.loss_func(y_pred, imgs)
+        synth_imgs = self.gen_model(imgs, y_pred)
+        loss = self.loss.loss_func(synth_imgs, imgs)
 
         loss.backward()
-         # Print gradients
-        # total_norm = 0
-        # parameters = [p for p in self.htr_model.parameters() if p.grad is not None and p.requires_grad]
-        # for p in parameters:
-        #     param_norm = p.grad.detach().data.norm(2)
-        #     total_norm += param_norm.item() ** 2
-        # total_norm = total_norm ** 0.5
-
-        # print(total_norm)
 
         torch.nn.utils.clip_grad_norm_(self.htr_model.parameters(), 1.0)
         self.optimizer.step()
@@ -108,11 +133,36 @@ class HTRtrainer(object):
         gt_labels = gt_labels.detach()
         cer, wer = self.evaluate(y_pred_max, gt_labels)
 
-        return loss, cer, wer, #total_norm
+        return loss.detach().cpu(), cer, wer, #total_norm
+    
+    def train_batch_supervised(self, batch):
+        self.htr_model.train()
+        imgs, gt_labels = batch
 
+        imgs = imgs.to(self.device)
+        gt_labels = gt_labels.to(self.device)
+
+        self.optimizer.zero_grad(set_to_none=True)
+
+        y_pred = self.htr_model(imgs[:,0,:,:].unsqueeze(1))
+        loss = self.loss.loss_func(y_pred, gt_labels)
+
+        loss.backward()
+
+        torch.nn.utils.clip_grad_norm_(self.htr_model.parameters(), 1.0)
+        self.optimizer.step()
+
+        y_pred_soft = torch.nn.functional.softmax(y_pred, dim=2).detach()
+        y_pred_max = torch.max(y_pred_soft, dim=2).indices
+        gt_labels = gt_labels.detach()
+        cer, wer = self.evaluate(y_pred_max, gt_labels)
+
+        return loss.detach().cpu(), cer, wer
 
 
     def train_model(self, train_loader, valid_loader, epochs):
+        train_saver = LossSaver(self.loss_name, "train", 16)
+        valid_saver = LossSaver(self.loss_name, "valid", 16)
         s_epoch, end_epoch = epochs
         # torch.autograd.set_detect_anomaly(True)
         for epoch in range(s_epoch, end_epoch):
@@ -122,14 +172,20 @@ class HTRtrainer(object):
             avg_cer = 0
             avg_wer = 0
 
-            for batch in tqdm(train_loader):
+            for idx, batch in tqdm(enumerate(train_loader)):
                 loss, cer, wer = self.train_batch(batch)
                 # print(loss)
                 avg_loss += loss
                 avg_cer += cer
                 avg_wer += wer
+                if idx == 1:
+                    break
             self.scheduler.step()
 
+            n_train_batches = len(train_loader)
+            print(avg_loss)
+            print(cer)
+            train_saver.save_to_csv(epoch, avg_loss/n_train_batches, avg_cer/n_train_batches, avg_wer/n_train_batches)
             torch.save(self.htr_model.state_dict(), "./htr_model.model")
             print(f"mean train loss epoch {epoch}: {avg_loss/len(train_loader)}, cer: {avg_cer/len(train_loader)}, wer: {avg_wer/len(train_loader)}")
             avg_loss = 0
@@ -142,7 +198,10 @@ class HTRtrainer(object):
                 avg_loss += loss
                 avg_cer += cer
                 avg_wer += wer
-
+                if idx == 2:
+                    break
+            n_valid_batches = len(valid_loader)
+            valid_saver.save_to_csv(epoch, avg_loss/n_valid_batches, avg_cer/n_valid_batches, avg_wer/n_valid_batches)
             print(f"mean validation loss epoch {epoch}: {avg_loss/len(valid_loader)}, cer: {avg_cer/len(valid_loader)}, wer: {avg_wer/len(valid_loader)}")
             # self.save_images(4, syn_imgs.cpu().numpy(), imgs.cpu().numpy(), y_pred, y_true, plot=True)
             print("predictions last batch: ")

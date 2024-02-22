@@ -1,28 +1,22 @@
 from torch import nn
 import torch
-from network.gen_model.gen_model import GenModel_FC
+
 from torchmetrics.image import StructuralSimilarityIndexMeasure
 from torchsummary import summary
 
 class Loss:
-    def __init__(self, loss_name, self_supervised, tokenizer, device):
-        self.loss_func = self.get_loss_func(loss_name, device)
+    def __init__(self, loss_name, tokenizer, device):
         self.tokenizer = tokenizer
         self.device = device
-
-        if self_supervised:
-            self.gen_model = GenModel_FC(tokenizer.maxlen, tokenizer.vocab_size, tokenizer.PAD)
-            self.gen_model.load_state_dict(torch.load('./network/gen_model/gen_model.model')) #load
-            self.gen_model.eval()
-            self.gen_model.to(self.device)
-
+        self.loss_func = self.get_loss_func(loss_name, device)
+        
 
     def get_loss_func(self, loss_input, device):
         if loss_input.lower() == "ctc":
             self.ctc_loss = nn.CTCLoss(blank=self.tokenizer.BLANK, zero_infinity=True)
             return self.ctc_loss_func
         elif loss_input.lower() == "ssim":
-            self.ssim = StructuralSimilarityIndexMeasure(data_range=(-1.0, 1.0)).to(device)
+            self.ssim = StructuralSimilarityIndexMeasure(data_range=(-1.0, 1.0)).to(self.device)
             return self.ssim_loss
         elif loss_input.lower() == "perceptual":
             self.vgg_model = torch.hub.load('pytorch/vision:v0.10.0', 'vgg16', pretrained=True)
@@ -46,15 +40,10 @@ class Loss:
         return ctc
     
 
-    def ssim_loss(self, y_pred, gt_imgs):
-
-        synth_imgs = self.gen_model(gt_imgs, y_pred)
-        # print(synth_imgs.shape, gt_imgs.shape)
+    def ssim_loss(self, synth_imgs, gt_imgs):
         return 1. - self.ssim(preds=synth_imgs, target=gt_imgs[:,0:1,:])
 
-    def perceptual_loss_func(self, y_pred, gt_imgs):
-        synth_imgs = self.gen_model(gt_imgs, y_pred)
-
+    def perceptual_loss_func(self, synth_imgs, gt_imgs):
         # TODO: copy twice for 3 channel vgg input
 
         gt_feats = self.vgg_model(gt_imgs[0]) # htr input is first image, others are to capture style
