@@ -2,6 +2,7 @@ import os, sys
 import torch.utils.data as D
 import cv2
 import numpy as np
+from torchvision import transforms
 
 
 
@@ -11,6 +12,11 @@ class RIMES_data(D.Dataset):
         self.input_size = input_size
         self.tokenizer = tokenizer
         self.num_images = num_images
+
+        self.transforms = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.5], std=[0.5])
+        ])
 
 
     def img_padding(self, img, input_height):
@@ -62,9 +68,12 @@ class RIMES_data(D.Dataset):
 
         return outImg, img_width
     
-    def normalize(self, img):
+    def gen_normalize(self, img):
         img = 1. - (img / 255.) # 0-255 -> 0-1
 
+        return self.htr_normalize(img)
+
+    def htr_normalize(self, img):
         m, s = 0.5, 0.5
         img = (img - m) / s
         return img.astype('float32')
@@ -84,15 +93,14 @@ class RIMES_data(D.Dataset):
     def __getitem__(self, idx):
         img_path, label = self.img_paths[idx]
 
-        img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+        img = 255 - cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
         
-
-        img = self.normalize(img)
+        img = self.transforms(img)
         gen_input = self.copy_style_imgs(img)
 
         label = self.tokenizer.encode(label)
         
-        return gen_input, np.asarray(label)
+        return img, gen_input, np.asarray(label)
     
     def __len__(self):
         return len(self.img_paths)

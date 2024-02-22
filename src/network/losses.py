@@ -1,5 +1,6 @@
 from torch import nn
 import torch
+from torchvision import models
 
 from torchmetrics.image import StructuralSimilarityIndexMeasure
 from torchsummary import summary
@@ -19,12 +20,13 @@ class Loss:
             self.ssim = StructuralSimilarityIndexMeasure(data_range=(-1.0, 1.0)).to(self.device)
             return self.ssim_loss
         elif loss_input.lower() == "perceptual":
-            self.vgg_model = torch.hub.load('pytorch/vision:v0.10.0', 'vgg16', pretrained=True)
-            summary(self.vgg_model(3, 224, 224))
+            self.vgg_model = models.vgg16(pretrained=True).features[:12]
+            self.vgg_model.to(self.device)
+            print(self.vgg_model)
             self.vgg_model.eval()
             return self.perceptual_loss_func
         else:
-            print("Loss not implemented. Choose one of: ctc, ssim")
+            print("Loss not implemented. Choose one of: ctc, ssim, perceptual")
     
     def ctc_loss_func(self, y_pred, gt_labels):
 
@@ -35,19 +37,19 @@ class Loss:
 
         y_pred_log = torch.permute(y_pred_log, dims=(1,0,2))
 
-        print(y_pred_log.shape, gt_labels.shape)
         ctc = self.ctc_loss(y_pred_log, gt_labels, input_lengths, target_lengths)
         return ctc
-    
 
-    def ssim_loss(self, synth_imgs, gt_imgs):
-        return 1. - self.ssim(preds=synth_imgs, target=gt_imgs[:,0:1,:])
+    def ssim_loss(self, synth_imgs, gt_img):
+        return 1. - self.ssim(preds=synth_imgs, target=gt_img.unsqueeze(1))
 
-    def perceptual_loss_func(self, synth_imgs, gt_imgs):
-        # TODO: copy twice for 3 channel vgg input
+    def perceptual_loss_func(self, synth_imgs, gt_img):
+        gt_vgg_input = torch.stack([gt_img, gt_img, gt_img], dim=1)
+        synth_vgg_input = torch.stack([synth_imgs.squeeze(1), synth_imgs.squeeze(1), synth_imgs.squeeze(1)], dim=1)
 
-        gt_feats = self.vgg_model(gt_imgs[0]) # htr input is first image, others are to capture style
-        synth_feats = self.vgg_model(synth_imgs)
-        return torch.mean((gt_feats - synth_feats ** 2))
+        gt_feats = self.vgg_model(gt_vgg_input) 
+        synth_feats = self.vgg_model(synth_vgg_input)
+
+        return torch.mean((gt_feats - synth_feats) ** 2)
 
 

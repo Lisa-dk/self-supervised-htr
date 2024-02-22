@@ -68,19 +68,23 @@ if __name__ == "__main__":
     if args.train:
         htr_model = Puigcerver(input_size=input_size, d_model=tokenizer.vocab_size)
         if args.self_supervised:
-            model_name = './htr_model_self_supervised.model'
+            model_name = f"./htr_models/{args.loss}/htr_model_self_supervised.model"
+            
         else:
-            model_name = './htr_model_supervised.model'
+            model_name = f"./htr_models{args.loss}/htr_model_self_supervised.model"
+
         if os.path.exists(model_name):
             htr_model.load_state_dict(torch.load('./htr_model.model')) #load
-
         
-        optimizer = torch.optim.RMSprop(htr_model.parameters(), lr=0.001, momentum=0.9)
-        scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, 1.0, 0.3)
-        
+        if args.self_supervised:
+            optimizer = torch.optim.Adam(htr_model.parameters(), lr=0.001)
+            scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, 1.0, 0.3, 10)
+        else:
+            optimizer = torch.optim.RMSprop(htr_model.parameters(), lr=0.0003, momentum=0.9)
+            scheduler = None
 
         trainer = HTRtrainer(htr_model, optimizer=optimizer, lr_scheduler=scheduler, device=device, tokenizer=tokenizer, loss_name=args.loss, self_supervised=args.self_supervised)
-        trainer.train_model(train_loader=train_loader, valid_loader=valid_loader, epochs=(0, 10))
+        trainer.train_model(train_loader=train_loader, valid_loader=valid_loader, epochs=(0, 100))
 
     if args.test:
         pass
