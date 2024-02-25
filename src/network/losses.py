@@ -20,7 +20,7 @@ class Loss:
             self.ssim = StructuralSimilarityIndexMeasure(data_range=(-1.0, 1.0)).to(self.device)
             return self.ssim_loss
         elif loss_input.lower() == "perceptual":
-            self.vgg_model = models.vgg16(pretrained=True).features[:12]
+            self.vgg_model = models.vgg16(pretrained=True).features[:19]
             self.vgg_model.to(self.device)
             print(self.vgg_model)
             self.vgg_model.eval()

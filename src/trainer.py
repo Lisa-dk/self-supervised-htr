@@ -45,9 +45,10 @@ class HTRtrainer(object):
             f.suptitle(str(labels[idx]))
             print(pred_imgs[idx].shape)
             print(pred_imgs[idx][0].shape)
-            axarr[0].imshow(true_imgs[idx], cmap='gray')
+            axarr[0].imshow(true_imgs[idx][0], cmap='gray')
             axarr[1].imshow(pred_imgs[idx][0], cmap='gray')
-            axarr[0].set_title("synthetic ", pred_labels[idx])
+            print(pred_labels[idx])
+            axarr[0].set_title("synthetic " + pred_labels[idx])
             axarr[1].set_title("real")
             plt.savefig(dir_path +  str(labels[idx]) + 'images_at_epoch_{:04d}.png'.format(epoch))
             plt.show()
@@ -93,7 +94,7 @@ class HTRtrainer(object):
             gt_labels = gt_labels.detach()
             cer, wer, y_pred, y_true = self.evaluate(y_pred_max, gt_labels, show=True)
 
-        return loss.detach().cpu(), cer, wer, y_pred, y_true, #imgs[:,0,:,:], synth_imgs
+        return loss.detach().cpu(), cer, wer, y_pred, y_true#, imgs, synth_imgs
 
     def validate_supervised(self, batch):
         self.htr_model.eval()
@@ -217,21 +218,22 @@ class HTRtrainer(object):
             avg_wer = 0
 
             for idx, batch in tqdm(enumerate(valid_loader)):
-                loss, cer, wer, y_pred, y_true = self.validate(batch)
+                loss, cer, wer, y_pred, y_true, syn_imgs, imgs = self.validate(batch)
                 # print(loss)
                 avg_loss += loss
                 avg_cer += cer
                 avg_wer += wer
-                if idx == 10:
+                if idx == 5:
                     break
 
             n_valid_batches = len(valid_loader)
             valid_saver.save_to_csv(epoch, avg_loss/n_valid_batches, avg_cer/n_valid_batches, avg_wer/n_valid_batches)
             print(f"mean validation loss epoch {epoch}: {avg_loss/len(valid_loader)}, cer: {avg_cer/len(valid_loader)}, wer: {avg_wer/len(valid_loader)}")
-            # self.save_images(4, syn_imgs.cpu().numpy(), imgs.cpu().numpy(), y_pred, y_true, plot=True)
+            # self.save_images(8, syn_imgs.cpu().numpy(), imgs.cpu().numpy(), y_pred, y_true, plot=True)
             print("predictions last batch: ")
             for idx in range(len(y_pred)):
                 print(f"gt: {y_true[idx]}, pred: {y_pred[idx]}")
+            exit()
 
 
             

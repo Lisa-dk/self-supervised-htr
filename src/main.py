@@ -24,7 +24,7 @@ if __name__ == "__main__":
     parser.add_argument("--train", action="store_true", default=False)
     parser.add_argument("--test", action="store_true", default=False)
 
-    parser.add_argument("--epochs", type=int, default=1000)
+    parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument('--start_epoch', type=int, default=0)
 
     parser.add_argument("--batch_size", type=int, default=16)
@@ -68,23 +68,24 @@ if __name__ == "__main__":
     if args.train:
         htr_model = Puigcerver(input_size=input_size, d_model=tokenizer.vocab_size)
         if args.self_supervised:
-            model_name = f"./htr_models/{args.loss}/htr_model_self_supervised.model"
+            model_name = f"./htr_models/{args.loss}/htr_model_self_supervised-{args.start_epoch}.model"
             
         else:
-            model_name = f"./htr_models{args.loss}/htr_model_self_supervised.model"
+            model_name = f"./htr_models{args.loss}/htr_model_self_supervised-{args.start_epoch}.model"
 
         if os.path.exists(model_name):
-            htr_model.load_state_dict(torch.load('./htr_model.model')) #load
+            print("loading model: ", model_name)
+            htr_model.load_state_dict(torch.load(model_name)) #load
         
         if args.self_supervised:
             optimizer = torch.optim.Adam(htr_model.parameters(), lr=0.001)
             scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, 1.0, 0.3, 10)
         else:
-            optimizer = torch.optim.RMSprop(htr_model.parameters(), lr=0.0003, momentum=0.9)
+            optimizer = torch.optim.RMSprop(htr_model.parameters(), lr=0.0001, momentum=0.9)
             scheduler = None
 
         trainer = HTRtrainer(htr_model, optimizer=optimizer, lr_scheduler=scheduler, device=device, tokenizer=tokenizer, loss_name=args.loss, self_supervised=args.self_supervised)
-        trainer.train_model(train_loader=train_loader, valid_loader=valid_loader, epochs=(0, 100))
+        trainer.train_model(train_loader=train_loader, valid_loader=valid_loader, epochs=(args.start_epoch, args.epochs))
 
     if args.test:
         pass
