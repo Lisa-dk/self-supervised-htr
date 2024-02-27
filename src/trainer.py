@@ -94,7 +94,7 @@ class HTRtrainer(object):
             gt_labels = gt_labels.detach()
             cer, wer, y_pred, y_true = self.evaluate(y_pred_max, gt_labels, show=True)
 
-        return loss.detach().cpu(), cer, wer, y_pred, y_true#, imgs, synth_imgs
+        return loss.detach().cpu(), cer, wer, y_pred, y_true, imgs, synth_imgs
 
     def validate_supervised(self, batch):
         self.htr_model.eval()
@@ -183,7 +183,7 @@ class HTRtrainer(object):
         train_saver = LossSaver(f"{self.loss_name}-{self.mode}", "train", 16)
         valid_saver = LossSaver(f"{self.loss_name}-{self.mode}", "valid", 16)
         s_epoch, end_epoch = epochs
-        # torch.autograd.set_detect_anomaly(True)
+        torch.autograd.set_detect_anomaly(True)
         print(self.loss_name)
         
         for epoch in range(s_epoch, end_epoch):
@@ -201,7 +201,7 @@ class HTRtrainer(object):
                 avg_loss += loss
                 avg_cer += cer
                 avg_wer += wer
-                if idx == 10:
+                if idx == 5:
                     break
 
             if self.scheduler is not None:

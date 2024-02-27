@@ -66,6 +66,9 @@ class Puigcerver(nn.Module):
         self.dropout = nn.Dropout(0.5)
         self.fc = nn.Linear(512, d_model)
         # self.softmax = nn.Softmax(dim=2)
+    
+    def replace_head(self, new_d_model):
+        self.fc = nn.Linear(512, new_d_model)
 
     def weights_init(self, m):
         if isinstance(m, nn.Conv2d):

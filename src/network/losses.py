@@ -25,6 +25,13 @@ class Loss:
             print(self.vgg_model)
             self.vgg_model.eval()
             return self.perceptual_loss_func
+        elif loss_input.lower() == "vgg_ssim":
+            self.ssim = StructuralSimilarityIndexMeasure(data_range=10.0).to(self.device)
+            self.vgg_model = models.vgg16(pretrained=True).features[:19]
+            self.vgg_model.to(self.device)
+            print(self.vgg_model)
+            self.vgg_model.eval()
+            return self.vgg_ssim_loss
         else:
             print("Loss not implemented. Choose one of: ctc, ssim, perceptual")
     
@@ -42,6 +49,26 @@ class Loss:
 
     def ssim_loss(self, synth_imgs, gt_img):
         return 1. - self.ssim(preds=synth_imgs, target=gt_img.unsqueeze(1))
+
+    def vgg_ssim_loss(self, synth_imgs, gt_img):
+        gt_vgg_input = torch.stack([gt_img, gt_img, gt_img], dim=1)
+        synth_vgg_input = torch.stack([synth_imgs.squeeze(1), synth_imgs.squeeze(1), synth_imgs.squeeze(1)], dim=1)
+
+        gt_feats = self.vgg_model(gt_vgg_input)
+        synth_feats = self.vgg_model(synth_vgg_input)
+
+        gt_feats_sum = torch.sum(gt_feats, dim=1).unsqueeze(0)/gt_feats.shape[1] + 0.0000000001
+        synth_feats_sum = torch.sum(synth_feats, dim=1).unsqueeze(0)/synth_feats.shape[1] + 0.0000000001
+
+        print("gt_feats_sum:", torch.min(gt_feats_sum), torch.min(synth_feats_sum), torch.max(torch.max(gt_feats_sum)), torch.max(synth_feats_sum))
+        print(gt_feats_sum.dtype, synth_feats_sum.dtype)
+
+        ssim_loss = 1. - self.ssim(preds=gt_feats_sum, target=synth_feats_sum)
+
+        print("ssim_loss:", ssim_loss)
+
+        return ssim_loss
+
 
     def perceptual_loss_func(self, synth_imgs, gt_img):
         gt_vgg_input = torch.stack([gt_img, gt_img, gt_img], dim=1)

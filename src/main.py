@@ -8,7 +8,8 @@ import argparse
 from data.tokenizer import Tokenizer
 import string
 from data.reader import read_rimes
-from data.preproc import preproc_rimes
+import data.preproc
+# from data.preproc import preproc_iam, preproc_rimes
 from network.models import Puigcerver
 from trainer import HTRtrainer
 from data.data_loader import RIMES_data
@@ -29,15 +30,16 @@ if __name__ == "__main__":
 
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--loss", type=str, default="ctc")
+    parser.add_argument("--pretrained", action="store_true", default=False)
     args = parser.parse_args()
 
     dataset_path = os.path.join("..", "data", args.dataset, "words")
 
     if args.preproc:
         print("Preparing data...")
-        path_from = os.path.join("..", "raw", args.dataset, "words")
+        path_from = os.path.join("..", "raw", args.dataset)
         os.makedirs(dataset_path, exist_ok=True)
-        preproc_rimes(path_from, dataset_path)
+        getattr(data.preproc, f"preproc_{args.dataset}")(path_from, dataset_path)
 
 
     os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
@@ -66,23 +68,35 @@ if __name__ == "__main__":
     test_loader = torch.utils.data.DataLoader(data_test, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
 
     if args.train:
-        htr_model = Puigcerver(input_size=input_size, d_model=tokenizer.vocab_size)
-        if args.self_supervised:
-            model_name = f"./htr_models/{args.loss}/htr_model_self_supervised-{args.start_epoch}.model"
-            
-        else:
-            model_name = f"./htr_models{args.loss}/htr_model_self_supervised-{args.start_epoch}.model"
+        
+        if not args.pretrained:
+            htr_model = Puigcerver(input_size=input_size, d_model=tokenizer.vocab_size)
+            if args.self_supervised:
+                model_name = f"./htr_models/{args.loss}/htr_model_self_supervised-{args.start_epoch}.model"
+                
+            else:
+                model_name = f"./htr_models/{args.loss}/htr_model_self_supervised-{args.start_epoch}.model"
 
-        if os.path.exists(model_name):
-            print("loading model: ", model_name)
-            htr_model.load_state_dict(torch.load(model_name)) #load
+            if os.path.exists(model_name):
+                print("loading model: ", model_name)
+                htr_model.load_state_dict(torch.load(model_name)) #load
+        else:
+            htr_model = Puigcerver(input_size=input_size, d_model=tokenizer.vocab_size + 1)
+            model_name = f"./htr_models/iam/htr_model_supervised.model"
+            if os.path.exists(model_name):
+                print("loading pretrained model model: ", model_name)
+                htr_model.load_state_dict(torch.load(model_name)) #load
+                htr_model.replace_head(tokenizer.vocab_size)
+
         
         if args.self_supervised:
-            optimizer = torch.optim.Adam(htr_model.parameters(), lr=0.001)
-            scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, 1.0, 0.3, 10)
+            optimizer = torch.optim.Adam(htr_model.parameters(), lr=0.005)
+            #optimizer = torch.optim.RMSprop(htr_model.parameters(), lr=0.01, momentum=0.9)
+            scheduler = torch.optim.lr_scheduler.PolynomialLR(optimizer, 50, 0.5)
         else:
-            optimizer = torch.optim.RMSprop(htr_model.parameters(), lr=0.0001, momentum=0.9)
-            scheduler = None
+            optimizer = torch.optim.Adam(htr_model.parameters(), lr=0.0001)
+            #optimizer = torch.optim.RMSprop(htr_model.parameters(), lr=0.0001, momentum=0.9)
+            scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, 1.0, 0.1, 100)
 
         trainer = HTRtrainer(htr_model, optimizer=optimizer, lr_scheduler=scheduler, device=device, tokenizer=tokenizer, loss_name=args.loss, self_supervised=args.self_supervised)
         trainer.train_model(train_loader=train_loader, valid_loader=valid_loader, epochs=(args.start_epoch, args.epochs))

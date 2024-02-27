@@ -1,7 +1,25 @@
 import cv2, sys, os, string
 import numpy as np
-
+import matplotlib.pyplot as plt
 INPUT_SIZE = (216, 64, 1)
+
+
+def img_padding(img, input_height):
+        # split by inverted because otherwise images with small height get 
+        # too 'zoomed in'
+        if len(img)/input_height <= 0.5:
+            desired_height = input_height
+            delta_h = int(((desired_height - len(img))/2) * (1 - (len(img)/input_height)))
+        else:
+            delta_h = 0
+        new_im = np.pad(
+                    img,
+                    pad_width=((delta_h, delta_h), (0, 0)),
+                    mode="constant",
+                    constant_values=(255),
+        )
+        return new_im
+
 
 def resize(img, input_size):
 
@@ -18,7 +36,10 @@ def resize(img, input_size):
     img = cv2.resize(img, new_size, interpolation=cv2.INTER_CUBIC)
 
     target = np.ones([ht, wt], dtype=np.uint8) * background
-    target[0:new_size[1], 0:new_size[0]] = img
+
+    start = int((ht / 2) - (new_size[1] / 2))
+    end = start + new_size[1]
+    target[start:end, :img.shape[-1]] = img
 
     return target
 
@@ -38,9 +59,10 @@ def normalize(img):
     return (img - m) / s
 
 def preproc_rimes(folder_from, folder_to) -> None:
+    folder_from = os.path.join(folder_from, "words")
     partitions = ['train', 'valid', 'test']
     for partition in partitions:
-        new_file_name = text_file = os.path.join(folder_to, f"ground_truth_{partition}_filtered.txt")
+        new_file_name = os.path.join(folder_to, f"ground_truth_{partition}_filtered.txt")
 
         text_file = os.path.join(folder_from, f"ground_truth_{partition}_icdar2011.txt")
 
@@ -64,6 +86,7 @@ def preproc_rimes(folder_from, folder_to) -> None:
             img_path_from = os.path.join(folder_from, partition, img_path)
 
             img = cv2.imread(img_path_from, cv2.IMREAD_GRAYSCALE)
+            img = img_padding(img, INPUT_SIZE[1])
             img = resize(img, INPUT_SIZE)
             # img = normalize(img)
 
@@ -75,7 +98,63 @@ def preproc_rimes(folder_from, folder_to) -> None:
 
             with open(new_file_name, mode="a", encoding="utf-8") as new_data_file:
                 new_data_file.write(f"{new_img_path} {gt_label}\n")
-            
+
+def preproc_iam(folder_from, folder_to) -> None:
+    """IAM words dataset reader"""
+    partitions = ['train', 'valid', 'test']
+    gt_dict = {}
+
+    pt_path = os.path.join(folder_from, "largeWriterIndependentWordRecognitionTask")
+    
+    paths = {"train": open(os.path.join(pt_path, "trainset.txt")).read().splitlines(),
+                "valid": open(os.path.join(pt_path, "validationset1.txt")).read().splitlines() +
+                open(os.path.join(pt_path, "validationset2.txt")).read().splitlines(),
+                "test": open(os.path.join(pt_path, "testset.txt")).read().splitlines()}
+    
+    lines = open(os.path.join(folder_from, "ascii", "words.txt")).read().splitlines()
+
+    for line in lines:
+        if (not line or line[0] == "#"):
+            continue
+
+        split = line.split()
+        gt_dict[split[0]] = " ".join(split[8::]).replace("|", " ")
+
+    for i in partitions:
+        new_file_name = os.path.join(folder_to, f"ground_truth_{i}_filtered.txt")
+        for line in paths[i]:
+            try:
+                gt_label = gt_dict[line]
+
+                if len(gt_label) <= 1:
+                    continue
+
+                if not set(string.punctuation).isdisjoint(set(gt_label)):
+                    continue
+
+                if not set(string.digits).isdisjoint(set(gt_label)):
+                    continue
+
+                split = line.split("-")
+                folder = f"{split[0]}-{split[1]}"
+
+                img_file = f"{split[0]}-{split[1]}-{split[2]}-{split[3]}.png"
+                img_path_from = os.path.join(folder_from, "words", split[0], folder, img_file)
+
+                img = cv2.imread(img_path_from, cv2.IMREAD_GRAYSCALE)
+                img = img_padding(img, INPUT_SIZE[1])
+                img = resize(img, INPUT_SIZE)
+
+                os.makedirs(os.path.join(folder_to, i, split[0], folder), exist_ok=True)
+                new_img_path = os.path.join(folder_to, i, split[0], folder, img_file)
+                cv2.imwrite(new_img_path, img)
+
+                with open(new_file_name, mode="a", encoding="utf-8") as new_data_file:
+                    new_data_file.write(f"{new_img_path} {gt_label}\n")
+
+            except KeyError:
+                pass
+        
 
 def main():
     dataset_name = sys.argv[1]

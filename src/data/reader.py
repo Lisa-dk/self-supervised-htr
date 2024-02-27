@@ -13,7 +13,12 @@ def read_rimes(folder):
             lines = data_file.read().splitlines()
 
         for line in lines:
-            img_path, gt_label = line.split(' ')
+            line_split = line.split(' ')
+            if len(line_split) > 2:
+                img_path, gt_label = line_split[0], ''.join(line_split[1:])
+            else:
+                img_path, gt_label = line_split[0], line_split[1]
+
             if len(gt_label) in lens.keys():
                 lens[len(gt_label)] += 1
             else:
