@@ -19,7 +19,7 @@ class Loss:
         elif loss_input.lower() == "ssim":
             self.ssim = StructuralSimilarityIndexMeasure(data_range=(-1.0, 1.0)).to(self.device)
             return self.ssim_loss
-        elif loss_input.lower() == "perceptual":
+        elif loss_input.lower() == "vgg":
             self.vgg_model = models.vgg16(pretrained=True).features[:19]
             self.vgg_model.to(self.device)
             print(self.vgg_model)
@@ -32,8 +32,11 @@ class Loss:
             print(self.vgg_model)
             self.vgg_model.eval()
             return self.vgg_ssim_loss
+        elif loss_input.lower() == "pp":
+            return self.prof_loss
         else:
             print("Loss not implemented. Choose one of: ctc, ssim, perceptual")
+            exit()
     
     def ctc_loss_func(self, y_pred, gt_labels):
 
@@ -57,18 +60,11 @@ class Loss:
         gt_feats = self.vgg_model(gt_vgg_input)
         synth_feats = self.vgg_model(synth_vgg_input)
 
-        gt_feats_sum = torch.sum(gt_feats, dim=1).unsqueeze(0)/gt_feats.shape[1] + 0.0000000001
-        synth_feats_sum = torch.sum(synth_feats, dim=1).unsqueeze(0)/synth_feats.shape[1] + 0.0000000001
+        vgg_loss = torch.mean((gt_feats - synth_feats) ** 2)
 
-        print("gt_feats_sum:", torch.min(gt_feats_sum), torch.min(synth_feats_sum), torch.max(torch.max(gt_feats_sum)), torch.max(synth_feats_sum))
-        print(gt_feats_sum.dtype, synth_feats_sum.dtype)
+        ssim_loss = 1. - self.ssim(preds=synth_imgs, target=gt_img.unsqueeze(1))
 
-        ssim_loss = 1. - self.ssim(preds=gt_feats_sum, target=synth_feats_sum)
-
-        print("ssim_loss:", ssim_loss)
-
-        return ssim_loss
-
+        return ssim_loss + vgg_loss
 
     def perceptual_loss_func(self, synth_imgs, gt_img):
         gt_vgg_input = torch.stack([gt_img, gt_img, gt_img], dim=1)
@@ -78,5 +74,13 @@ class Loss:
         synth_feats = self.vgg_model(synth_vgg_input)
 
         return torch.mean((gt_feats - synth_feats) ** 2)
+    
+    def prof_loss(self, synth_imgs, gt_imgs):
+        gt_imgs = (gt_imgs - (-1.)) / 2.    # 1 - (-1)
+        synth_imgs = (synth_imgs - (-1.)) / 2.
+        
+        vertical_profile = gt_imgs.sum(dim=1) / gt_imgs.shape[-2]
+        synth_vertical_profile = synth_imgs.squeeze(1).sum(dim=1) / synth_imgs.shape[-2]
 
+        return torch.mean((vertical_profile - synth_vertical_profile) ** 2.)           
 
