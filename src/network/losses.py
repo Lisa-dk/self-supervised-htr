@@ -4,15 +4,16 @@ from torchvision import models
 
 from torchmetrics.image import StructuralSimilarityIndexMeasure
 from torchsummary import summary
+from network.models import Puigcerver_Dropout
 
 class Loss:
-    def __init__(self, loss_name, tokenizer, device):
+    def __init__(self, loss_name, tokenizer, device, vgg_layer):
         self.tokenizer = tokenizer
         self.device = device
-        self.loss_func = self.get_loss_func(loss_name, device)
+        self.loss_func = self.get_loss_func(loss_name, vgg_layer)
         
 
-    def get_loss_func(self, loss_input, device):
+    def get_loss_func(self, loss_input, vgg_layer):
         if loss_input.lower() == "ctc":
             self.ctc_loss = nn.CTCLoss(blank=self.tokenizer.BLANK, zero_infinity=True)
             return self.ctc_loss_func
@@ -20,20 +21,32 @@ class Loss:
             self.ssim = StructuralSimilarityIndexMeasure(data_range=(-1.0, 1.0)).to(self.device)
             return self.ssim_loss
         elif loss_input.lower() == "vgg":
-            self.vgg_model = models.vgg16(pretrained=True).features[:19]
+            self.vgg_model = models.vgg16(pretrained=True).features[:vgg_layer]
             self.vgg_model.to(self.device)
             print(self.vgg_model)
             self.vgg_model.eval()
             return self.perceptual_loss_func
         elif loss_input.lower() == "vgg_ssim":
             self.ssim = StructuralSimilarityIndexMeasure(data_range=10.0).to(self.device)
-            self.vgg_model = models.vgg16(pretrained=True).features[:19]
+            self.vgg_model = models.vgg16(pretrained=True).features[:vgg_layer]
             self.vgg_model.to(self.device)
             print(self.vgg_model)
             self.vgg_model.eval()
             return self.vgg_ssim_loss
         elif loss_input.lower() == "pp":
             return self.prof_loss
+        elif loss_input.lower() == "htr":
+            self.iam_model = Puigcerver_Dropout((64, 216, 1), self.tokenizer.vocab_size + 1)
+            model_name = f"./htr_models/iam/ctc/htr_model_supervised-40.model"
+            self.iam_model.load_state_dict(torch.load(model_name))
+            self.iam_model = self.iam_model.cnn.to(self.device)
+            return self.htr_loss
+        elif loss_input.lower() == "vgg_pp":
+            self.vgg_model = models.vgg16(pretrained=True).features[:vgg_layer]
+            self.vgg_model.to(self.device)
+            print(self.vgg_model)
+            self.vgg_model.eval()
+            return self.vgg_prof
         else:
             print("Loss not implemented. Choose one of: ctc, ssim, perceptual")
             exit()
@@ -78,9 +91,41 @@ class Loss:
     def prof_loss(self, synth_imgs, gt_imgs):
         gt_imgs = (gt_imgs - (-1.)) / 2.    # 1 - (-1)
         synth_imgs = (synth_imgs - (-1.)) / 2.
+
+        print(torch.min(gt_imgs), torch.max(gt_imgs.sum(dim=1)))
         
-        vertical_profile = gt_imgs.sum(dim=1) / gt_imgs.shape[-2]
+        vertical_profile = gt_imgs.sum(dim=1) / synth_imgs.shape[-2]
         synth_vertical_profile = synth_imgs.squeeze(1).sum(dim=1) / synth_imgs.shape[-2]
 
-        return torch.mean((vertical_profile - synth_vertical_profile) ** 2.)           
+        return torch.mean((vertical_profile - synth_vertical_profile) ** 2.)      
+    
+    def htr_loss(self, synth_imgs, gt_imgs):
+        gt_feats = self.iam_model(gt_imgs.squeeze(0).unsqueeze(1))
+        synth_feats = self.iam_model(synth_imgs)
+        
+        return torch.mean((gt_feats - synth_feats) ** 2.)
+    
+    def vgg_prof(self, synth_imgs, gt_imgs):
+        synth_imgs = synth_imgs.squeeze(1)
+
+        gt_vgg_input = torch.stack([gt_imgs, gt_imgs, gt_imgs], dim=1)
+        synth_vgg_input = torch.stack([synth_imgs, synth_imgs, synth_imgs], dim=1)
+
+        gt_feats = self.vgg_model(gt_vgg_input) 
+        synth_feats = self.vgg_model(synth_vgg_input)
+
+        vgg_loss =  torch.mean((gt_feats - synth_feats) ** 2)
+
+        gt_imgs = (gt_imgs - (-1.)) / 2.    # 1 - (-1)
+        synth_imgs = (synth_imgs - (-1.)) / 2.
+        
+        vertical_profile = gt_imgs.sum(dim=1) / synth_imgs.shape[-2]
+        synth_vertical_profile = synth_imgs.sum(dim=1) / synth_imgs.shape[-2]
+
+        proj_prof_loss = torch.mean((vertical_profile - synth_vertical_profile) ** 2.) * 100
+        return vgg_loss + proj_prof_loss
+
+
+
+
 

@@ -1,6 +1,6 @@
 import os
 
-def read_rimes(folder):
+def read_rimes(folder, max_word_len):
     partitions = ['train', 'valid', 'test']
     dataset = {}
     lens = {}
@@ -18,6 +18,9 @@ def read_rimes(folder):
                 img_path, gt_label = line_split[0], ''.join(line_split[1:])
             else:
                 img_path, gt_label = line_split[0], line_split[1]
+            
+            if len(gt_label) > max_word_len:
+                continue
 
             if len(gt_label) in lens.keys():
                 lens[len(gt_label)] += 1

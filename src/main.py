@@ -65,7 +65,7 @@ if __name__ == "__main__":
     num_tokens = len(tokens.keys())
     vocab_size = num_classes + num_tokens
     
-    data_train, data_valid, data_test = read_rimes(dataset_path)
+    data_train, data_valid, data_test = read_rimes(dataset_path, args.max_word_len)
 
     data_train = RIMES_data(data_train, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs)
     data_valid = RIMES_data(data_valid, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs)
@@ -80,12 +80,14 @@ if __name__ == "__main__":
         if not args.pretrained:
             htr_model = Puigcerver(input_size=input_size, d_model=tokenizer.vocab_size)
             if args.self_supervised:
-                folder_name =f"{args.dataset}/{args.loss}-{args.vgg_layer}-{args.max_word_len}chars-adam-lr001" if "vgg" in args.loss else f"{args.loss}-{args.max_word_len}chars-adam-lr001"
+                folder_name =f"{args.dataset}/{args.loss}-{args.vgg_layer}-{args.max_word_len}char-adam-lr001" if "vgg" in args.loss else f"{args.dataset}/{args.loss}-{args.max_word_len}char-adam-lr001"
                 model_name = f"./htr_models/{folder_name}/htr_model_self_supervised-{args.start_epoch}.model"
+                print(model_name)
                 
             else:
                 folder_name = f"{args.dataset}/{args.loss}-{args.max_word_len}-chars-rms-lr0001"
                 model_name = f"./htr_models/{folder_name}/htr_model_supervised-{args.start_epoch}.model"
+                print(model_name)
 
             if os.path.exists(model_name):
                 print("loading model: ", model_name)
@@ -97,7 +99,7 @@ if __name__ == "__main__":
             if os.path.exists(model_name):
                 print("loading pretrained model model: ", model_name)
                 htr_model.load_state_dict(torch.load(model_name)) #load
-                # htr_model.replace_head(tokenizer.vocab_size)
+                htr_model.replace_head(tokenizer.vocab_size)
 
         
         if args.self_supervised:
@@ -109,7 +111,7 @@ if __name__ == "__main__":
             #optimizer = torch.optim.RMSprop(htr_model.parameters(), lr=0.0001, momentum=0.9)
             scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, 1.0, 0.1, 100)
 
-        trainer = HTRtrainer(htr_model, optimizer=optimizer, lr_scheduler=scheduler, device=device, tokenizer=tokenizer, loss_name=args.loss, self_supervised=args.self_supervised, folder_name=folder_name)
+        trainer = HTRtrainer(htr_model, optimizer=optimizer, lr_scheduler=scheduler, device=device, tokenizer=tokenizer, loss_name=args.loss, self_supervised=args.self_supervised, folder_name=folder_name, vgg_layer=args.vgg_layer)
         trainer.train_model(train_loader=train_loader, valid_loader=valid_loader, epochs=(args.start_epoch, args.epochs))
 
     else:
