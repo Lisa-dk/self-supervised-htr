@@ -8,10 +8,11 @@ import matplotlib.pyplot as plt
 import os
 from loss_saver import LossSaver
 from network.gen_model.gen_model import GenModel_FC
+from torchaudio.models.decoder import ctc_decoder
 
 
 class HTRtrainer(object):
-    def __init__(self, model, optimizer, lr_scheduler, device, tokenizer, loss_name, self_supervised):
+    def __init__(self, model, optimizer, lr_scheduler, device, tokenizer, loss_name, self_supervised, folder_name):
         super(HTRtrainer, self).__init__()
         self.htr_model = model.to(device)
         self.optimizer = optimizer
@@ -19,10 +20,16 @@ class HTRtrainer(object):
 
         self.loss_name = loss_name
         self.loss = Loss(loss_name, tokenizer, device)
+        self.exp_folder = folder_name
         
         self.device = device
         self.max_text_length = tokenizer.maxlen
         self.tokenizer = tokenizer
+        self.beam_search_decoder = ctc_decoder(lexicon=None,
+            tokens=[char for char in tokenizer.chars + '-' + '|'],
+            nbest=3,
+            beam_size=1500
+        )
 
         if self_supervised:
             self.gen_model = GenModel_FC(tokenizer.maxlen, tokenizer.vocab_size, tokenizer.PAD)
@@ -141,7 +148,9 @@ class HTRtrainer(object):
         torch.nn.utils.clip_grad_norm_(self.htr_model.parameters(), 1.0)
         self.optimizer.step()
 
-        y_pred_max = torch.max(y_pred, dim=2).indices.detach()
+        # beam_search_transcript = self.beam_search_decoder(y_pred.detach().cpu())[:][0]
+        # print(beam_search_transcript)
+        y_pred_max = torch.max(y_pred, dim=2).indices
         gt_labels = gt_labels.detach()
         cer, wer = self.evaluate(y_pred_max, gt_labels)
 
@@ -180,8 +189,8 @@ class HTRtrainer(object):
 
 
     def train_model(self, train_loader, valid_loader, epochs):
-        train_saver = LossSaver(f"{self.loss_name}-{self.mode}", "train", 16)
-        valid_saver = LossSaver(f"{self.loss_name}-{self.mode}", "valid", 16)
+        train_saver = LossSaver(f"{self.exp_folder}", "train", 16)
+        valid_saver = LossSaver(f"{self.exp_folder}", "valid", 16)
         s_epoch, end_epoch = epochs
         torch.autograd.set_detect_anomaly(True)
         print(self.loss_name)
@@ -195,36 +204,32 @@ class HTRtrainer(object):
             if self.scheduler is not None:
                 print("learning rate: ", self.scheduler.get_last_lr())
 
-            for idx, batch in tqdm(enumerate(train_loader)):
-                loss, cer, wer, norm = self.train_batch(batch)
-                # print(loss)
-                avg_loss += loss
-                avg_cer += cer
-                avg_wer += wer
-                if idx == 5:
-                    break
+            # for idx, batch in tqdm(enumerate(train_loader)):
+            #     loss, cer, wer, norm = self.train_batch(batch)
+            #     # print(loss)
+            #     avg_loss += loss
+            #     avg_cer += cer
+            #     avg_wer += wer
 
-            if self.scheduler is not None:
-                self.scheduler.step()
+            # if self.scheduler is not None:
+            #     self.scheduler.step()
 
-            n_train_batches = len(train_loader)
-            train_saver.save_to_csv(epoch, avg_loss/n_train_batches, avg_cer/n_train_batches, avg_wer/n_train_batches)
-            dir = f"./htr_models/{self.loss_name}/"
-            os.makedirs(dir, exist_ok=True)
-            torch.save(self.htr_model.state_dict(), f"{dir}htr_model_{self.mode}-{epoch}.model")
-            print(f"mean train loss epoch {epoch}: {avg_loss/len(train_loader)}, cer: {avg_cer/len(train_loader)}, wer: {avg_wer/len(train_loader)} last norm: {norm}")
-            avg_loss = 0
-            avg_cer = 0
-            avg_wer = 0
+            # n_train_batches = len(train_loader)
+            # train_saver.save_to_csv(epoch, avg_loss/n_train_batches, avg_cer/n_train_batches, avg_wer/n_train_batches)
+            # dir = f"./htr_models/{self.exp_folder}/"
+            # os.makedirs(dir, exist_ok=True)
+            # torch.save(self.htr_model.state_dict(), f"{dir}htr_model_{self.mode}-{epoch}.model")
+            # print(f"mean train loss epoch {epoch}: {avg_loss/len(train_loader)}, cer: {avg_cer/len(train_loader)}, wer: {avg_wer/len(train_loader)} last norm: {norm}")
+            # avg_loss = 0
+            # avg_cer = 0
+            # avg_wer = 0
 
             for idx, batch in tqdm(enumerate(valid_loader)):
-                loss, cer, wer, y_pred, y_true, syn_imgs, imgs = self.validate(batch)
+                loss, cer, wer, y_pred, y_true = self.validate(batch)
                 # print(loss)
                 avg_loss += loss
                 avg_cer += cer
                 avg_wer += wer
-                if idx == 5:
-                    break
 
             n_valid_batches = len(valid_loader)
             valid_saver.save_to_csv(epoch, avg_loss/n_valid_batches, avg_cer/n_valid_batches, avg_wer/n_valid_batches)
@@ -234,12 +239,3 @@ class HTRtrainer(object):
             for idx in range(len(y_pred)):
                 print(f"gt: {y_true[idx]}, pred: {y_pred[idx]}")
             exit()
-
-
-            
-
-
-
-
-
-        
