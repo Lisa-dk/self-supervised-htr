@@ -89,7 +89,7 @@ class Loss:
         return torch.mean((gt_feats - synth_feats) ** 2)
     
     def prof_loss(self, synth_imgs, gt_imgs):
-        gt_imgs = (gt_imgs - (-1.)) / 2.    # 1 - (-1)
+        gt_imgs = (gt_imgs - (-1.)) / 2.    # 0-1
         synth_imgs = (synth_imgs - (-1.)) / 2.
 
         print(torch.min(gt_imgs), torch.max(gt_imgs.sum(dim=1)))
@@ -116,7 +116,7 @@ class Loss:
 
         vgg_loss =  torch.mean((gt_feats - synth_feats) ** 2)
 
-        gt_imgs = (gt_imgs - (-1.)) / 2.    # 1 - (-1)
+        gt_imgs = (gt_imgs - (-1.)) / 2.    # 0-1
         synth_imgs = (synth_imgs - (-1.)) / 2.
         
         vertical_profile = gt_imgs.sum(dim=1) / synth_imgs.shape[-2]
