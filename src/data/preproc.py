@@ -5,11 +5,10 @@ INPUT_SIZE = (216, 64, 1)
 
 
 def img_padding(img, input_height):
-        # split by inverted because otherwise images with small height get 
-        # too 'zoomed in'
+       
         if len(img)/input_height <= 0.5:
             desired_height = input_height
-            delta_h = int(((desired_height - len(img))/2) * (1 - (len(img)/input_height)))
+            delta_h = int(((desired_height - len(img))/2) * (1 - (len(img)/input_height))) # * 1 - ratio other small images are too zoomed int
         else:
             delta_h = 0
         new_im = np.pad(
@@ -22,14 +21,15 @@ def img_padding(img, input_height):
 
 
 def resize(img, input_size):
+    """Resize and center img to given input_size by ratio to height or width"""
 
     u, i = np.unique(np.array(img).flatten(), return_inverse=True)
-    background = int(u[np.argmax(np.bincount(i))])
+    background = int(u[np.argmax(np.bincount(i))]) # most frequent occuring pixel value
 
     wt, ht, _ = input_size
     h, w = np.asarray(img).shape
 
-    f = max((w / wt), (h / ht))
+    f = max((w / wt), (h / ht)) # ratio for resizing
 
     new_size = (max(min(wt, int(w / f)), 1), max(min(ht, int(h / f)), 1))
 
@@ -37,9 +37,10 @@ def resize(img, input_size):
 
     target = np.ones([ht, wt], dtype=np.uint8) * background
 
+    # vertical centering
     start = int((ht / 2) - (new_size[1] / 2))
     end = start + new_size[1]
-    target[start:end, :img.shape[-1]] = img
+    target[start:end, :img.shape[-1]] = img 
 
     return target
 
@@ -59,6 +60,7 @@ def normalize(img):
     return (img - m) / s
 
 def preproc_rimes(folder_from, folder_to) -> None:
+    """Read RIMES data in given folder and save pre-processed images to new folder"""
     folder_from = os.path.join(folder_from, "words")
     partitions = ['train', 'valid', 'test']
     for partition in partitions:
@@ -72,12 +74,15 @@ def preproc_rimes(folder_from, folder_to) -> None:
         for line in lines:
             img_path, gt_label = line.split(' ')            
 
+            # skip 1-char words
             if len(gt_label) <= 1:
                 continue
-
+            
+            # skip words with punctuation
             if not set(string.punctuation).isdisjoint(set(gt_label)):
                 continue
 
+            # skip words with digits
             if not set(string.digits).isdisjoint(set(gt_label)):
                 continue
 
@@ -88,7 +93,6 @@ def preproc_rimes(folder_from, folder_to) -> None:
             img = cv2.imread(img_path_from, cv2.IMREAD_GRAYSCALE)
             img = img_padding(img, INPUT_SIZE[1])
             img = resize(img, INPUT_SIZE)
-            # img = normalize(img)
 
             img_folder = '\\'.join(img_path.split('\\')[:-1])
             os.makedirs(os.path.join(folder_to, partition, img_folder), exist_ok=True)
@@ -100,7 +104,7 @@ def preproc_rimes(folder_from, folder_to) -> None:
                 new_data_file.write(f"{new_img_path} {gt_label}\n")
 
 def preproc_iam(folder_from, folder_to) -> None:
-    """IAM words dataset reader"""
+    """Read IAM words from given folder and save preprocessed images to new folder"""
     partitions = ['train', 'valid', 'test']
     gt_dict = {}
 
@@ -126,12 +130,15 @@ def preproc_iam(folder_from, folder_to) -> None:
             try:
                 gt_label = gt_dict[line]
 
+                # skip 1-char words
                 if len(gt_label) <= 1:
                     continue
 
+                # skip words with punctuation
                 if not set(string.punctuation).isdisjoint(set(gt_label)):
                     continue
 
+                # skip words with digits
                 if not set(string.digits).isdisjoint(set(gt_label)):
                     continue
 

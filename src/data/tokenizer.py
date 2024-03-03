@@ -9,6 +9,7 @@ class Tokenizer():
         self.PAD_TK, self.UNK_TK = "¶", "¤"
         self.GO_TK, self.END_TK = "♂", "♀"
         self.self_supervised = self_supervised
+        # ctc loss requires an extra blank token
         if not self_supervised:
             self.BLAN_TK = '#'
             self.chars = (self.GO_TK + self.END_TK + self.PAD_TK + self.UNK_TK + chars + self.BLAN_TK)
@@ -33,8 +34,6 @@ class Tokenizer():
         text = unicodedata.normalize("NFKD", text).encode("ASCII", "ignore").decode("ASCII")
         text = " ".join(text.split())
 
-        # groups = ["".join(group) for _, group in groupby(text)]
-        # text = "".join([self.UNK_TK.join(list(x)) if len(x) > 1 else x for x in groups])
         text = self.GO_TK + text + self.END_TK
         encoded = []
 
@@ -58,7 +57,7 @@ class Tokenizer():
 
 
     def remove_tokens(self, text):
-        """Remove tokens (PAD) from text"""
+        """Remove tokens (PAD, UNK, GO, END, BLANK) from text"""
         if self.self_supervised:
             return text.replace(self.PAD_TK, "").replace(self.UNK_TK, "").replace(self.GO_TK, "").replace(self.END_TK, "")
         else:

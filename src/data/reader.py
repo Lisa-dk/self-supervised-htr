@@ -1,6 +1,7 @@
 import os
 
 def read_rimes(folder, max_word_len):
+    """Get data paths and labels (with max_word_len) of images in folder."""
     partitions = ['train', 'valid', 'test']
     dataset = {}
     lens = {}
@@ -26,7 +27,6 @@ def read_rimes(folder, max_word_len):
                 lens[len(gt_label)] += 1
             else:
                 lens[len(gt_label)] = 1
-            # print(img_path, gt_label)
             
             img_path = img_path.replace("/", "\\")
             # img_path = os.path.join(folder, partition, img_path)
