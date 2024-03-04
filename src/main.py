@@ -56,17 +56,20 @@ if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     input_size = (64, 216, 1)
-    num_style_imgs = 15
+    num_style_imgs = 15 # num imgs for generator to extract style from
 
     charset_base = string.ascii_lowercase + string.ascii_uppercase
     
     tokenizer = Tokenizer(chars=charset_base, max_text_length=max_text_length, self_supervised=args.self_supervised)
 
+    # definitions for generator
     num_classes = len(charset_base)
     tokens = {'GO_TOKEN': tokenizer.GO, 'PAD_TOKEN': tokenizer.PAD, 'UNK_TOKEN': tokenizer.UNK, "END_TOKEN":tokenizer.END}
     num_tokens = len(tokens.keys())
     vocab_size = num_classes + num_tokens
     
+    # get data paths and labels (path, label)
+    # TODO: change function name to sth general
     data_train, data_valid, data_test = read_rimes(dataset_path, args.max_word_len)
 
     data_train = RIMES_data(data_train, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs)
