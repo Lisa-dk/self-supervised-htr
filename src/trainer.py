@@ -134,9 +134,6 @@ class HTRtrainer(object):
         mask = (y_pred_max >= 1.0).float()
         y_pred_max =y_pred_max * mask
 
-        for i in y_pred_max:
-            print(i[2:5])
-
         synth_imgs = self.gen_model(gen_imgs, y_pred_max)
         loss = self.loss.loss_func(synth_imgs, gen_imgs[:,0,:,:])
 
@@ -154,8 +151,6 @@ class HTRtrainer(object):
         torch.nn.utils.clip_grad_norm_(self.htr_model.parameters(), 1.0)
         self.optimizer.step()
 
-        # beam_search_transcript = self.beam_search_decoder(y_pred.detach().cpu())[:][0]
-        # print(beam_search_transcript)
         y_pred_max = torch.max(y_pred, dim=2).indices
         gt_labels = gt_labels.detach()
         cer, wer = self.evaluate(y_pred_max, gt_labels)
@@ -198,7 +193,7 @@ class HTRtrainer(object):
         train_saver = LossSaver(f"{self.exp_folder}", "train", 16)
         valid_saver = LossSaver(f"{self.exp_folder}", "valid", 16)
         s_epoch, end_epoch = epochs
-        torch.autograd.set_detect_anomaly(True)
+        # torch.autograd.set_detect_anomaly(True)
         print(self.loss_name)
         
         for epoch in range(s_epoch, end_epoch):
@@ -216,8 +211,6 @@ class HTRtrainer(object):
                 avg_loss += loss
                 avg_cer += cer
                 avg_wer += wer
-                if idx == 10:
-                    break
 
             if self.scheduler is not None:
                 self.scheduler.step()

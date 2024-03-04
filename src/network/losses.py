@@ -17,15 +17,18 @@ class Loss:
         if loss_input.lower() == "ctc":
             self.ctc_loss = nn.CTCLoss(blank=self.tokenizer.BLANK, zero_infinity=True)
             return self.ctc_loss_func
+        
         elif loss_input.lower() == "ssim":
             self.ssim = StructuralSimilarityIndexMeasure(data_range=(-1.0, 1.0)).to(self.device)
             return self.ssim_loss
+        
         elif loss_input.lower() == "vgg":
             self.vgg_model = models.vgg16(pretrained=True).features[:vgg_layer]
             self.vgg_model.to(self.device)
             print(self.vgg_model)
             self.vgg_model.eval()
             return self.perceptual_loss_func
+        
         elif loss_input.lower() == "vgg_ssim":
             self.ssim = StructuralSimilarityIndexMeasure(data_range=10.0).to(self.device)
             self.vgg_model = models.vgg16(pretrained=True).features[:vgg_layer]
@@ -33,14 +36,17 @@ class Loss:
             print(self.vgg_model)
             self.vgg_model.eval()
             return self.vgg_ssim_loss
+        
         elif loss_input.lower() == "pp":
             return self.prof_loss
+        
         elif loss_input.lower() == "htr":
             self.iam_model = Puigcerver_Dropout((64, 216, 1), self.tokenizer.vocab_size + 1)
             model_name = f"./htr_models/iam/ctc/htr_model_supervised-40.model"
             self.iam_model.load_state_dict(torch.load(model_name))
             self.iam_model = self.iam_model.cnn.to(self.device)
             return self.htr_loss
+        
         elif loss_input.lower() == "vgg_pp":
             self.vgg_model = models.vgg16(pretrained=True).features[:vgg_layer]
             self.vgg_model.to(self.device)
@@ -60,8 +66,7 @@ class Loss:
 
         y_pred_log = torch.permute(y_pred_log, dims=(1,0,2))
 
-        ctc = self.ctc_loss(y_pred_log, gt_labels, input_lengths, target_lengths)
-        return ctc
+        return self.ctc_loss(y_pred_log, gt_labels, input_lengths, target_lengths)
 
     def ssim_loss(self, synth_imgs, gt_img):
         return 1. - self.ssim(preds=synth_imgs, target=gt_img.unsqueeze(1))
@@ -92,7 +97,7 @@ class Loss:
         gt_imgs = (gt_imgs - (-1.)) / 2.    # 0-1
         synth_imgs = (synth_imgs - (-1.)) / 2.
 
-        print(torch.min(gt_imgs), torch.max(gt_imgs.sum(dim=1)))
+        # print(torch.min(gt_imgs), torch.max(gt_imgs.sum(dim=1)))
         
         vertical_profile = gt_imgs.sum(dim=1) / synth_imgs.shape[-2]
         synth_vertical_profile = synth_imgs.squeeze(1).sum(dim=1) / synth_imgs.shape[-2]
