@@ -111,8 +111,9 @@ if __name__ == "__main__":
         
         if args.self_supervised:
             optimizer = torch.optim.Adam(htr_model.parameters(), lr=0.001)
-            #optimizer = torch.optim.RMSprop(htr_model.parameters(), lr=0.01, momentum=0.9)
-            scheduler = torch.optim.lr_scheduler.PolynomialLR(optimizer, 50, 0.5)
+            #optimizer = torch.optim.RMSprop(htr_model.parameters(), lr=0.001, momentum=0.9)
+            scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, 1.0, 0.25, 50)
+            #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=5, verbose=True)
         else:
             optimizer = torch.optim.Adam(htr_model.parameters(), lr=0.0001)
             #optimizer = torch.optim.RMSprop(htr_model.parameters(), lr=0.0001, momentum=0.9)

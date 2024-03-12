@@ -225,6 +225,7 @@ class HTRtrainer(object):
             train_saver.save_to_csv(epoch, avg_loss/n_train_batches, avg_cer/n_train_batches, avg_wer/n_train_batches)
             dir = f"./htr_models/{self.exp_folder}/"
             os.makedirs(dir, exist_ok=True)
+            # TODO: save and load optimizer state
             torch.save(self.htr_model.state_dict(), f"{dir}htr_model_{self.mode}-{epoch}.model")
             print(f"mean train loss epoch {epoch}: {avg_loss/len(train_loader)}, cer: {avg_cer/len(train_loader)}, wer: {avg_wer/len(train_loader)} last norm: {norm}")
             avg_loss = 0
