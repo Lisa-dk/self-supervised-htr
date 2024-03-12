@@ -10,7 +10,7 @@ import string
 from data.reader import read_rimes
 import data.preproc
 # from data.preproc import preproc_iam, preproc_rimes
-from network.models import Puigcerver
+from network.models import Puigcerver, Puigcerver_Dropout
 from trainer import HTRtrainer
 from data.data_loader import RIMES_data
 import editdistance
@@ -83,14 +83,16 @@ if __name__ == "__main__":
     if args.train:
         
         if not args.pretrained:
-            htr_model = Puigcerver(input_size=input_size, d_model=tokenizer.vocab_size)
+            
             if args.self_supervised:
-                folder_name =f"{args.dataset}/{args.loss}-{args.vgg_layer}-{args.max_word_len}char-adam-lr001" if "vgg" in args.loss else f"{args.dataset}/{args.loss}-{args.max_word_len}char-adam-lr001"
+                htr_model = Puigcerver(input_size=input_size, d_model=tokenizer.vocab_size)
+                folder_name =f"{args.dataset}/{args.loss}-{args.vgg_layer}-{args.max_word_len}char-adam-lr001-lin" if "vgg" in args.loss else f"{args.dataset}/{args.loss}-{args.max_word_len}char-adam-lr001"
                 model_name = f"./htr_models/{folder_name}/htr_model_self_supervised-{args.start_epoch}.model"
                 print(model_name)
                 
             else:
-                folder_name = f"{args.dataset}/{args.loss}-{args.max_word_len}-chars-rms-lr0001"
+                htr_model = Puigcerver_Dropout(input_size=input_size, d_model=tokenizer.vocab_size)
+                folder_name = f"{args.dataset}/{args.loss}-{args.max_word_len}-chars-rms-lr0001-dense"
                 model_name = f"./htr_models/{folder_name}/htr_model_supervised-{args.start_epoch}.model"
                 print(model_name)
 
@@ -98,7 +100,7 @@ if __name__ == "__main__":
                 print("loading model: ", model_name)
                 htr_model.load_state_dict(torch.load(model_name)) #load
         else:
-            htr_model = Puigcerver(input_size=input_size, d_model=tokenizer.vocab_size)
+            htr_model = Puigcerver_Dropout(input_size=input_size, d_model=tokenizer.vocab_size)
             model_name = f"./htr_models/iam/ctc/htr_model_supervised-40.model"
             folder_name = f"{args.dataset}/{args.loss}-{args.vgg_layer}-{args.max_word_len}chars-adam-lr001" if "vgg" in args.loss else f"{args.loss}-{args.max_word_len}chars-adam-lr001"
             if os.path.exists(model_name):
@@ -114,7 +116,7 @@ if __name__ == "__main__":
         else:
             optimizer = torch.optim.Adam(htr_model.parameters(), lr=0.0001)
             #optimizer = torch.optim.RMSprop(htr_model.parameters(), lr=0.0001, momentum=0.9)
-            scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, 1.0, 0.1, 100)
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.2, patience=5, verbose=True)
 
         trainer = HTRtrainer(htr_model, optimizer=optimizer, lr_scheduler=scheduler, device=device, tokenizer=tokenizer, loss_name=args.loss, self_supervised=args.self_supervised, folder_name=folder_name, vgg_layer=args.vgg_layer)
         trainer.train_model(train_loader=train_loader, valid_loader=valid_loader, epochs=(args.start_epoch, args.epochs))

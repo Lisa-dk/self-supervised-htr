@@ -37,6 +37,7 @@ class Puigcerver(nn.Module):
 
         self.blstm = nn.LSTM(input_size=640, hidden_size=256, num_layers=5, bidirectional=True, batch_first=True)#, dropout=0.5)
         # self.dropout = nn.Dropout(0.5)
+        # self.fc1 = nn.Linear(256, 512)
         self.fc = nn.Linear(512, d_model)
     
     def replace_head(self, new_d_model):
@@ -54,6 +55,7 @@ class Puigcerver(nn.Module):
         x, _ = self.blstm(x)
         # x = self.fc(self.dropout(x))
         x = self.fc(x)
+        # x = self.fc2(self.fc1(x))
         return x
     
 class Puigcerver_Dropout(nn.Module):
@@ -91,8 +93,10 @@ class Puigcerver_Dropout(nn.Module):
         self.cnn.apply(self.weights_init)
 
         self.blstm = nn.LSTM(input_size=640, hidden_size=256, num_layers=5, bidirectional=True, batch_first=True, dropout=0.5)
-        self.dropout = nn.Dropout(0.5)
-        self.fc = nn.Linear(512, d_model)
+        self.dropout1 = nn.Dropout(0.5)
+        self.fc1 =  nn.Linear(512, 256)
+        self.dropout2= nn.Dropout(0.5)
+        self.fc2 = nn.Linear(256, d_model)
     
     def replace_head(self, new_d_model):
         self.fc = nn.Linear(512, new_d_model)
@@ -108,7 +112,9 @@ class Puigcerver_Dropout(nn.Module):
         x = x.view(batch_size, height, width * channels)
 
         x, _ = self.blstm(x)
-        x = self.fc(self.dropout(x))
+        x = self.fc1(self.dropout1(x))
+        x = self.fc2(self.dropout2(x))
+
         return x
 
 # def calculate_padding(input_size, kernel_size, stride):

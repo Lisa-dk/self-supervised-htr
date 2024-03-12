@@ -39,7 +39,7 @@ class HTRtrainer(object):
         self.validate = getattr(self, f"validate_{self.mode}")
 
     def save_images(self, epoch, pred_imgs, true_imgs, pred_labels, labels, plot=False):
-        dir_path = './results/imgs/'
+        dir_path = './results/imgs/' + self.exp_folder + '/'
         os.makedirs(dir_path, exist_ok=True)
 
         for idx in range(len(true_imgs)):
@@ -89,6 +89,15 @@ class HTRtrainer(object):
 
             y_pred = self.htr_model(imgs)
             y_pred = nn.functional.softmax(y_pred, 2)
+            # y_pred_max, _ = torch.max(y_pred, dim=2, keepdim=True)
+            # y_pred_max = y_pred / y_pred_max
+
+            # mask = (y_pred_max >= 1.0).float()
+            # y_pred_max =y_pred_max * mask
+
+            # gt_labels_1hot = gt_labels.long()
+            # gt_labels_1hot = torch.nn.functional.one_hot(gt_labels_1hot, 56).float()
+
             synth_imgs = self.gen_model(gen_imgs, y_pred)
             loss = self.loss.loss_func(synth_imgs, gen_imgs[:,0,:,:])
 
@@ -128,13 +137,13 @@ class HTRtrainer(object):
 
         y_pred = self.htr_model(imgs)
         y_pred = nn.functional.softmax(y_pred, 2)
-        y_pred_max, _ = torch.max(y_pred, dim=2, keepdim=True)
-        y_pred_max = y_pred / y_pred_max
+        # y_pred_max, _ = torch.max(y_pred, dim=2, keepdim=True)
+        # y_pred_max = y_pred / y_pred_max
 
-        mask = (y_pred_max >= 1.0).float()
-        y_pred_max =y_pred_max * mask
+        # mask = (y_pred_max >= 1.0).float()
+        # y_pred_max =y_pred_max * mask
 
-        synth_imgs = self.gen_model(gen_imgs, y_pred_max)
+        synth_imgs = self.gen_model(gen_imgs, y_pred)
         loss = self.loss.loss_func(synth_imgs, gen_imgs[:,0,:,:])
 
         loss.backward()
@@ -202,8 +211,6 @@ class HTRtrainer(object):
             avg_loss = 0
             avg_cer = 0
             avg_wer = 0
-            if self.scheduler is not None:
-                print("learning rate: ", self.scheduler.get_last_lr())
 
             for idx, batch in tqdm(enumerate(train_loader)):
                 loss, cer, wer, norm = self.train_batch(batch)
@@ -212,8 +219,7 @@ class HTRtrainer(object):
                 avg_cer += cer
                 avg_wer += wer
 
-            if self.scheduler is not None:
-                self.scheduler.step()
+            
 
             n_train_batches = len(train_loader)
             train_saver.save_to_csv(epoch, avg_loss/n_train_batches, avg_cer/n_train_batches, avg_wer/n_train_batches)
@@ -233,10 +239,18 @@ class HTRtrainer(object):
                 avg_wer += wer
 
             n_valid_batches = len(valid_loader)
+            
+            if self.scheduler is not None:
+                self.scheduler.step(avg_loss/n_valid_batches)
+
+            if self.scheduler is not None:
+                # print("learning rate: ", self.scheduler.get_last_lr())
+                print("learning rate: ", self.scheduler._last_lr)
+
+            
             valid_saver.save_to_csv(epoch, avg_loss/n_valid_batches, avg_cer/n_valid_batches, avg_wer/n_valid_batches)
             print(f"mean validation loss epoch {epoch}: {avg_loss/len(valid_loader)}, cer: {avg_cer/len(valid_loader)}, wer: {avg_wer/len(valid_loader)}")
-            self.save_images(8, syn_imgs.cpu().numpy(), imgs.cpu().numpy(), y_pred, y_true, plot=True)
+            self.save_images(epoch, syn_imgs.cpu().numpy(), imgs.cpu().numpy(), y_pred, y_true, plot=True)
             print("predictions last batch: ")
             for idx in range(len(y_pred)):
                 print(f"gt: {y_true[idx]}, pred: {y_pred[idx]}")
-            exit()
