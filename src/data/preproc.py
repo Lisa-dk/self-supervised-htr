@@ -178,6 +178,7 @@ def preproc_iam(folder_from, folder_to) -> None:
             try:
                 wid_path, gt_label = line.split(' ')
                 wid, img_path = wid_path.split(',')
+                img_path = img_path.replace('/', '\\')
 
                 # skip 1-char words
                 if len(gt_label) <= 1:
@@ -197,7 +198,7 @@ def preproc_iam(folder_from, folder_to) -> None:
                 img = img_padding(img, INPUT_SIZE[1])
                 img = resize(img, INPUT_SIZE)
 
-                f1, f2, _ = img_path.split('/')
+                f1, f2, _ = img_path.split('\\')
 
                 os.makedirs(os.path.join(folder_to, i, f1, f2), exist_ok=True)
                 new_img_path = os.path.join(folder_to, i, img_path)

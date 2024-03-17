@@ -89,14 +89,15 @@ class HTRtrainer(object):
 
             y_pred = self.htr_model(imgs)
             y_pred = nn.functional.softmax(y_pred, 2)
+            y_pred = y_pred[:,:,:-1]
             # y_pred_max, _ = torch.max(y_pred, dim=2, keepdim=True)
             # y_pred_max = y_pred / y_pred_max
 
             # mask = (y_pred_max >= 1.0).float()
             # y_pred_max =y_pred_max * mask
 
-            # gt_labels_1hot = gt_labels.long()
-            # gt_labels_1hot = torch.nn.functional.one_hot(gt_labels_1hot, 56).float()
+            gt_labels_1hot = gt_labels.long()
+            gt_labels_1hot = torch.nn.functional.one_hot(gt_labels_1hot, 56).float()
 
             synth_imgs = self.gen_model(gen_imgs, y_pred)
             loss = self.loss.loss_func(synth_imgs, gen_imgs[:,0,:,:])
@@ -118,7 +119,7 @@ class HTRtrainer(object):
             y_pred = self.htr_model(imgs)
             loss = self.loss.loss_func(y_pred, gt_labels)
 
-            y_pred_soft = torch.nn.functional.softmax(y_pred, dim=2).detach()
+            y_pred_soft = torch.nn.functional.softmax(y_pred[:,:,:-1], dim=2).detach()
             y_pred_max = torch.max(y_pred_soft, dim=2).indices
             gt_labels = gt_labels.detach()
             cer, wer, y_pred, y_true = self.evaluate(y_pred_max, gt_labels, show=True)
@@ -142,6 +143,7 @@ class HTRtrainer(object):
 
         # mask = (y_pred_max >= 1.0).float()
         # y_pred_max =y_pred_max * mask
+        y_pred = y_pred[:,:,:-1]
 
         synth_imgs = self.gen_model(gen_imgs, y_pred)
         loss = self.loss.loss_func(synth_imgs, gen_imgs[:,0,:,:])
@@ -154,8 +156,8 @@ class HTRtrainer(object):
             param_norm = p.grad.detach().data.norm(2)
             total_norm += param_norm.item() ** 2
         total_norm = total_norm ** 0.5
-        print(total_norm)
-        print(loss)
+        # print(total_norm)
+        # print(loss)
 
         torch.nn.utils.clip_grad_norm_(self.htr_model.parameters(), 1.0)
         self.optimizer.step()
@@ -208,26 +210,26 @@ class HTRtrainer(object):
         for epoch in range(s_epoch, end_epoch):
             torch.backends.cudnn.benchmark = True
             print(epoch)
-            avg_loss = 0
-            avg_cer = 0
-            avg_wer = 0
+            # avg_loss = 0
+            # avg_cer = 0
+            # avg_wer = 0
 
-            for idx, batch in tqdm(enumerate(train_loader)):
-                loss, cer, wer, norm = self.train_batch(batch)
-                # print(loss)
-                avg_loss += loss
-                avg_cer += cer
-                avg_wer += wer
+            # for idx, batch in tqdm(enumerate(train_loader)):
+            #     loss, cer, wer, norm = self.train_batch(batch)
+            #     # print(loss)
+            #     avg_loss += loss
+            #     avg_cer += cer
+            #     avg_wer += wer
 
             
 
-            n_train_batches = len(train_loader)
-            train_saver.save_to_csv(epoch, avg_loss/n_train_batches, avg_cer/n_train_batches, avg_wer/n_train_batches)
-            dir = f"./htr_models/{self.exp_folder}/"
-            os.makedirs(dir, exist_ok=True)
-            # TODO: save and load optimizer state
-            torch.save(self.htr_model.state_dict(), f"{dir}htr_model_{self.mode}-{epoch}.model")
-            print(f"mean train loss epoch {epoch}: {avg_loss/len(train_loader)}, cer: {avg_cer/len(train_loader)}, wer: {avg_wer/len(train_loader)} last norm: {norm}")
+            # n_train_batches = len(train_loader)
+            # train_saver.save_to_csv(epoch, avg_loss/n_train_batches, avg_cer/n_train_batches, avg_wer/n_train_batches)
+            # dir = f"./htr_models/{self.exp_folder}/"
+            # os.makedirs(dir, exist_ok=True)
+            # # TODO: save and load optimizer state
+            # torch.save(self.htr_model.state_dict(), f"{dir}htr_model_{self.mode}-{epoch}.model")
+            # print(f"mean train loss epoch {epoch}: {avg_loss/len(train_loader)}, cer: {avg_cer/len(train_loader)}, wer: {avg_wer/len(train_loader)} last norm: {norm}")
             avg_loss = 0
             avg_cer = 0
             avg_wer = 0

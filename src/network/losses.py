@@ -122,16 +122,16 @@ class Loss:
     
     def htr_loss(self, synth_imgs, gt_imgs):
         gt_feats =  self.iam_model.cnn(gt_imgs.squeeze(0).unsqueeze(1))
-        batch_size, channels, width, height = gt_feats.size()
-        gt_feats = gt_feats.view(batch_size, height, width * channels)
-        gt_feats, _ = self.iam_model.blstm(gt_feats)
-        gt_feats = self.iam_model.fc1(gt_feats)
+        # batch_size, channels, width, height = gt_feats.size()
+        # gt_feats = gt_feats.view(batch_size, height, width * channels)
+        # gt_feats, _ = self.iam_model.blstm(gt_feats)
+        # gt_feats = self.iam_model.fc1(gt_feats)
 
         synth_feats =  self.iam_model.cnn(synth_imgs)
-        batch_size, channels, width, height = synth_feats.size()
-        synth_feats = synth_feats.view(batch_size, height, width * channels)
-        synth_feats, _ = self.iam_model.blstm(synth_feats)
-        synth_feats = self.iam_model.fc1(synth_feats)
+        # batch_size, channels, width, height = synth_feats.size()
+        # synth_feats = synth_feats.view(batch_size, height, width * channels)
+        # synth_feats, _ = self.iam_model.blstm(synth_feats)
+        # synth_feats = self.iam_model.fc1(synth_feats)
         
         return torch.mean((gt_feats - synth_feats) ** 2.)
     

@@ -70,11 +70,11 @@ if __name__ == "__main__":
     
     # get data paths and labels (path, label)
     # TODO: change function name to sth general
-    data_train, data_valid, data_test = read_rimes(dataset_path, args.max_word_len)
+    data_train, data_valid, data_test, wid_train, wid_valid, wid_test = read_rimes(dataset_path, args.max_word_len)
 
-    data_train = RIMES_data(data_train, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs)
-    data_valid = RIMES_data(data_valid, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs)
-    data_test = RIMES_data(data_test, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs)
+    data_train = RIMES_data(data_train, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_train)
+    data_valid = RIMES_data(data_valid, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_valid)
+    data_test = RIMES_data(data_test, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_test)
 
     train_loader = torch.utils.data.DataLoader(data_train, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=4)
     valid_loader = torch.utils.data.DataLoader(data_valid, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
@@ -100,13 +100,13 @@ if __name__ == "__main__":
                 print("loading model: ", model_name)
                 htr_model.load_state_dict(torch.load(model_name)) #load
         else:
-            htr_model = Puigcerver_Dropout(input_size=input_size, d_model=tokenizer.vocab_size)
+            htr_model = Puigcerver_Dropout(input_size=input_size, d_model=tokenizer.vocab_size + 1)
             model_name = f"./htr_models/iam/ctc/htr_model_supervised-40.model"
             folder_name = f"{args.dataset}/{args.loss}-{args.vgg_layer}-{args.max_word_len}chars-adam-lr001" if "vgg" in args.loss else f"{args.loss}-{args.max_word_len}chars-adam-lr001"
             if os.path.exists(model_name):
                 print("loading pretrained model model: ", model_name)
                 htr_model.load_state_dict(torch.load(model_name)) #load
-                htr_model.replace_head(tokenizer.vocab_size)
+                # htr_model.replace_head(tokenizer.vocab_size)
 
         
         if args.self_supervised:
@@ -122,19 +122,38 @@ if __name__ == "__main__":
         trainer = HTRtrainer(htr_model, optimizer=optimizer, lr_scheduler=scheduler, device=device, tokenizer=tokenizer, loss_name=args.loss, self_supervised=args.self_supervised, folder_name=folder_name, vgg_layer=args.vgg_layer)
         trainer.train_model(train_loader=train_loader, valid_loader=valid_loader, epochs=(args.start_epoch, args.epochs))
 
-    else:
+    elif args.test or args.valid:
         if args.test:
             data_loader = test_loader
         elif args.valid:
             data_loader = valid_loader
 
-        htr_model = Puigcerver(input_size=input_size, d_model=tokenizer.vocab_size).cuda()
+       
         folder_name = f"{args.dataset}/{args.loss}-{args.max_word_len}-chars-rms-lr0001"
         if args.self_supervised:
+            htr_model = Puigcerver(input_size=input_size, d_model=tokenizer.vocab_size).cuda()
             model_name = f"./htr_models/{folder_name}/htr_model_self_supervised-{args.start_epoch}.model"
+            # from torchaudio, so uses a silent token
+            beam_search_decoder = ctc_decoder(lexicon=None,
+                tokens=[char for char in tokenizer.chars + "|" + '#'],
+                nbest=1,
+                beam_size=50,
+                blank_token = "#",
+                sil_token = "|"
+            )
+        
         else:
             #model_name = f"./htr_models/{folder_name}/htr_model_supervised-{args.start_epoch}.model"
+            htr_model = Puigcerver_Dropout(input_size=input_size, d_model=tokenizer.vocab_size).cuda()
             model_name = f"./htr_models/iam/ctc/htr_model_supervised-40.model"
+            # from torchaudio, so uses a silent token
+            beam_search_decoder = ctc_decoder(lexicon=None,
+                tokens=[char for char in tokenizer.chars + "|"],
+                nbest=1,
+                beam_size=50,
+                blank_token = "#",
+                sil_token = "|"
+            )
         
         if os.path.exists(model_name):
                 print("Loading model: ", model_name)
@@ -144,17 +163,11 @@ if __name__ == "__main__":
             print("Model not found")
             exit()
 
-        # from torchaudio, so uses a silent token
-        beam_search_decoder = ctc_decoder(lexicon=None,
-            tokens=[char for char in tokenizer.chars + "|"],
-            nbest=1,
-            beam_size=50,
-            blank_token = "#",
-            sil_token = "|"
-        )
+        
 
         cer = 0
         wer = 0
+        total = 0
         for batch in tqdm(data_loader):
             imgs, _, gt_labels = batch
             imgs = imgs.to(device)
@@ -169,9 +182,9 @@ if __name__ == "__main__":
             y_pred = [tokenizer.decode(label) for label in y_pred_max]
             
             beam_search = beam_search_decoder(y_pred_soft)
-            y_pred_bs = [tokenizer.decode(label.tokens < 57) for label in beam_search[0]]
+            y_pred_bs = [tokenizer.decode(label[0].tokens * (label[0].tokens < 57)) for label in beam_search]
 
-            for (pd, gt) in zip(y_pred, gt_labels):
+            for (pd, gt) in zip(y_pred_bs, gt_labels):
                 pd_cer, gt_cer = list(pd), list(gt)
                 dist = editdistance.eval(pd_cer, gt_cer)
                 
@@ -180,5 +193,6 @@ if __name__ == "__main__":
                 pd_wer, gt_wer = pd.split(), gt.split()
                 dist = editdistance.eval(pd_wer, gt_wer)
                 wer += dist / (max(len(pd_wer), len(gt_wer)))
+            total += len(gt_labels)
 
-        print(f"CER: {cer / len(data_loader)}, WER: {wer / len(data_loader)}")   
+        print(f"CER: {cer / total}, WER: {wer / total}")   
