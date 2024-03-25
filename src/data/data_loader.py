@@ -44,7 +44,7 @@ class RIMES_data(D.Dataset):
         final_img = [single_img[:]]
 
         for path in copy_paths:
-            new_img = 255 - cv2.imread(path, cv2.IMREAD_GRAYSCALE) 
+            new_img = 255 - cv2.imread(path[0], cv2.IMREAD_GRAYSCALE) 
             new_img = self.transforms(new_img)
             final_img = final_img + [new_img]
 
@@ -66,7 +66,7 @@ class RIMES_data(D.Dataset):
 
         label = self.tokenizer.encode(label)
         
-        return img, gen_input, np.asarray(label)
+        return img, gen_input, np.asarray(label), wid
     
     def __len__(self):
         return len(self.img_paths)

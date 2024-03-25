@@ -44,7 +44,7 @@ def read_rimes(folder, max_word_len):
                 if wid not in wid_dict[partition].keys():
                     wid_dict[partition][wid] = []
                 
-                wid_dict[partition][wid].append(img_path)
+                wid_dict[partition][wid].append((img_path, gt_label))
 
             # img_path = os.path.join(folder, partition, img_path)
             dataset[partition].append((img_path, gt_label, wid))

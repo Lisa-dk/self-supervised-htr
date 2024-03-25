@@ -253,7 +253,7 @@ class HTRtrainer(object):
             
             valid_saver.save_to_csv(epoch, avg_loss/n_valid_batches, avg_cer/n_valid_batches, avg_wer/n_valid_batches)
             print(f"mean validation loss epoch {epoch}: {avg_loss/len(valid_loader)}, cer: {avg_cer/len(valid_loader)}, wer: {avg_wer/len(valid_loader)}")
-            self.save_images(epoch, syn_imgs.cpu().numpy(), imgs.cpu().numpy(), y_pred, y_true, plot=True)
+            self.save_images(epoch, syn_imgs.cpu().numpy(), imgs.cpu().numpy(), y_pred, y_true, plot=True) 
             print("predictions last batch: ")
             for idx in range(len(y_pred)):
                 print(f"gt: {y_true[idx]}, pred: {y_pred[idx]}")
