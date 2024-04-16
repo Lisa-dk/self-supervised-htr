@@ -4,8 +4,9 @@ from torchvision import models
 
 from torchmetrics.image import StructuralSimilarityIndexMeasure
 from torchsummary import summary
-from network.models import Puigcerver_Dropout
+from network.models import Puigcerver_supervised
 import kornia
+from network.sia_model.model import SiameseNetwork
 
 class Loss:
     def __init__(self, loss_name, tokenizer, device, vgg_layer):
@@ -45,8 +46,8 @@ class Loss:
             return self.prof_loss
         
         elif loss_input.lower() == "htr":
-            self.iam_model = Puigcerver_Dropout((64, 216, 1), self.tokenizer.vocab_size + 1)
-            model_name = f"./htr_models/iam/ctc/htr_model_supervised-35.model"
+            self.iam_model = Puigcerver_supervised((64, 216, 1), self.tokenizer.vocab_size + 1)
+            model_name = f"./network/htr_model_supervised-50.model"
             self.iam_model.load_state_dict(torch.load(model_name))
             self.iam_model = self.iam_model.to(self.device)
 
@@ -61,6 +62,13 @@ class Loss:
             print(self.vgg_model)
             self.vgg_model.eval()
             return self.vgg_prof
+        
+        elif loss_input.lower() == "siamese":
+            self.feat_model = SiameseNetwork()
+            self.feat_model.load_state_dict(torch.load('../src/network/sia_model/model-2.model'))
+            self.feat_model.to(self.device)
+            self.feat_model.eval()
+            return self.siamese_loss
         else:
             print("Loss not implemented. Choose one of: ctc, ssim, perceptual")
             exit()
@@ -122,18 +130,22 @@ class Loss:
     
     def htr_loss(self, synth_imgs, gt_imgs):
         gt_feats =  self.iam_model.cnn(gt_imgs.squeeze(0).unsqueeze(1))
-        # batch_size, channels, width, height = gt_feats.size()
-        # gt_feats = gt_feats.view(batch_size, height, width * channels)
-        # gt_feats, _ = self.iam_model.blstm(gt_feats)
-        # gt_feats = self.iam_model.fc1(gt_feats)
+        batch_size, channels, width, height = gt_feats.size()
+        gt_feats = gt_feats.view(batch_size, height, width * channels)
+        gt_feats, _ = self.iam_model.blstm(gt_feats)
+        gt_feats = self.iam_model.fc1(gt_feats)
+        gt_feats = self.iam_model.fc2(gt_feats)
+        gt_feats_flat = gt_feats.view(-1, 56)
 
         synth_feats =  self.iam_model.cnn(synth_imgs)
-        # batch_size, channels, width, height = synth_feats.size()
-        # synth_feats = synth_feats.view(batch_size, height, width * channels)
-        # synth_feats, _ = self.iam_model.blstm(synth_feats)
-        # synth_feats = self.iam_model.fc1(synth_feats)
+        batch_size, channels, width, height = synth_feats.size()
+        synth_feats = synth_feats.view(batch_size, height, width * channels)
+        synth_feats, _ = self.iam_model.blstm(synth_feats)
+        synth_feats = self.iam_model.fc1(synth_feats)
+        synth_feats = self.iam_model.fc2(synth_feats)
+        synth_feats_flat = synth_feats.view(-1, 56)
         
-        return torch.mean((gt_feats - synth_feats) ** 2.)
+        return nn.functional.cross_entropy(gt_feats_flat, synth_feats_flat)
     
     def vgg_prof(self, synth_imgs, gt_imgs):
         synth_imgs = synth_imgs.squeeze(1)
@@ -155,7 +167,15 @@ class Loss:
         proj_prof_loss = torch.mean((vertical_profile - synth_vertical_profile) ** 2.) * 100
         return vgg_loss + proj_prof_loss
 
+    def siamese_loss(self, synth_imgs, gt_imgs):
 
+        gt_input = torch.stack([gt_imgs, gt_imgs, gt_imgs], dim=1).squeeze(2)
+        synth_input = torch.stack([synth_imgs, synth_imgs, synth_imgs], dim=1).squeeze(2)
+
+        # print(gt_input.shape, synth_input.shape)
+
+        feats1, feats2 = self.feat_model(gt_input, synth_input)
+        return torch.mean(nn.functional.pairwise_distance(feats1, feats2))
 
 
 

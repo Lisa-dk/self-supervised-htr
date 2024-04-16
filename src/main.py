@@ -10,12 +10,14 @@ import string
 from data.reader import read_rimes
 import data.preproc
 # from data.preproc import preproc_iam, preproc_rimes
-from network.models import Puigcerver, Puigcerver_Dropout
+from network.models import Puigcerver, Puigcerver_Dropout, Puigcerver_supervised
 from trainer import HTRtrainer
 from data.data_loader import RIMES_data
 import editdistance
 from torchaudio.models.decoder import ctc_decoder
 from tqdm import tqdm
+from network.gen_model.gen_model import GenModel_FC
+
 
 
 if __name__ == "__main__":
@@ -29,11 +31,12 @@ if __name__ == "__main__":
     parser.add_argument("--train", action="store_true", default=False)
     parser.add_argument("--test", action="store_true", default=False)
     parser.add_argument("--valid", action="store_true", default=False)
+    parser.add_argument("--test_supervised", action="store_true", default=False)
 
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument('--start_epoch', type=int, default=0)
 
-    parser.add_argument("--batch_size", type=int, default=16)
+    parser.add_argument("--batch_size", type=int, default=8)
     parser.add_argument("--loss", type=str, default="ctc")
     parser.add_argument("--pretrained", action="store_true", default=False)
 
@@ -52,11 +55,11 @@ if __name__ == "__main__":
         getattr(data.preproc, f"preproc_{args.dataset}")(path_from, dataset_path)
 
 
-    os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+    # os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     input_size = (64, 216, 1)
-    num_style_imgs = 15 # num imgs for generator to extract style from
+    num_style_imgs = 25 # num imgs for generator to extract style from
 
     charset_base = string.ascii_lowercase + string.ascii_uppercase
     
@@ -163,7 +166,6 @@ if __name__ == "__main__":
             print("Model not found")
             exit()
 
-        
 
         cer = 0
         wer = 0
@@ -196,3 +198,60 @@ if __name__ == "__main__":
             total += len(gt_labels)
 
         print(f"CER: {cer / total}, WER: {wer / total}")   
+    elif args.test_supervised:
+
+        htr_model = Puigcerver_supervised(input_size=input_size, d_model=tokenizer.vocab_size).cuda()
+        model_name = f"./network/htr_model_supervised-50.model"
+        
+        if os.path.exists(model_name):
+                print("Loading model: ", model_name)
+                htr_model.load_state_dict(torch.load(model_name)) #load
+                htr_model.eval()
+        else:
+            print("Model not found")
+            exit()
+
+        gen_model = GenModel_FC(tokenizer.maxlen, tokenizer.vocab_size - 1, tokenizer.PAD)
+        # self.gen_model.load_state_dict(torch.load('./network/gen_model/gen_model-15all.model')) #load
+        gen_model.load_state_dict(torch.load('./network/gen_model/gen_model-25half.model'))
+        gen_model.eval()
+        gen_model.to(device)
+
+        cer = 0
+        wer = 0
+        total = 0
+        for batch in tqdm(train_loader):
+            imgs, gen_imgs, gt_labels, _ = batch
+            imgs = imgs.to(device)
+            gt_labels = gt_labels.to(device)
+
+            imgs = imgs.to(device)
+            gen_imgs = gen_imgs.to(device).squeeze(2)
+            gt_labels = gt_labels.to(device)
+
+            # gt_labels_1hot = gt_labels.long()
+            # gt_labels_1hot = torch.nn.functional.one_hot(gt_labels_1hot, 56).float()
+
+            # synth_imgs = gen_model(gen_imgs, gt_labels_1hot)
+
+            y_pred = htr_model(imgs)
+
+            y_pred_soft = torch.nn.functional.softmax(y_pred, dim=2).detach().cpu()
+            y_pred_max = torch.max(y_pred_soft, dim=2).indices
+            gt_labels = gt_labels.detach().cpu().numpy()
+            gt_labels = [tokenizer.decode(label) for label in gt_labels]
+            y_pred = [tokenizer.decode(label) for label in y_pred_max]
+            
+            for (pd, gt) in zip(y_pred, gt_labels):
+                pd_cer, gt_cer = list(pd), list(gt)
+                dist = editdistance.eval(pd_cer, gt_cer)
+                
+                cer += dist / (max(len(pd_cer), len(gt_cer)))
+
+                pd_wer, gt_wer = pd.split(), gt.split()
+                dist = editdistance.eval(pd_wer, gt_wer)
+                wer += dist / (max(len(pd_wer), len(gt_wer)))
+            total += len(gt_labels)
+
+        print(f"CER: {cer / total}, WER: {wer / total}")   
+
