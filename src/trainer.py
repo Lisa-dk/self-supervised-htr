@@ -8,7 +8,9 @@ import matplotlib.pyplot as plt
 import os
 from loss_saver import LossSaver
 from network.gen_model.gen_model import GenModel_FC
-from torchaudio.models.decoder import ctc_decoder
+import kornia, string
+import matplotlib.pyplot as plt
+from data.tokenizer import Tokenizer
 
 
 class HTRtrainer(object):
@@ -139,6 +141,20 @@ class HTRtrainer(object):
 
         y_pred = self.htr_model(imgs)
         y_pred = nn.functional.softmax(y_pred, 2)
+
+        # y_htr_pred = self.loss.iam_model(imgs)
+        # y_htr_pred = nn.functional.softmax(y_htr_pred, 2)
+        # y_pred_max = torch.max(y_htr_pred, dim=2).indices
+        # print(y_pred_max[0])
+        # print(y_pred_max[1])
+
+        # charset_base = string.ascii_lowercase + string.ascii_uppercase
+        # tokenizer = Tokenizer(chars=charset_base, max_text_length=25, self_supervised=False)
+
+        # y_pred_labels = np.asarray([tokenizer.decode(label) for label in y_pred_max])
+        # y_pred_labels_enc = np.asarray([tokenizer.encode(lab) for lab in y_pred_labels])
+        # y_pred_labels_1hot = torch.from_numpy(y_pred_labels_enc).long()
+        # y_pred_labels_1hot = torch.nn.functional.one_hot(y_pred_labels_1hot, 56).float()
         
         # y_pred_max, _ = torch.max(y_pred, dim=2, keepdim=True)
         # y_pred_max = y_pred / y_pred_max
@@ -148,6 +164,41 @@ class HTRtrainer(object):
         # y_pred = y_pred[:,:,:-1]
 
         synth_imgs = self.gen_model(gen_imgs, y_pred)
+
+        # y_htr_pred_synth = self.loss.iam_model(synth_imgs)
+
+        # y_htr_pred_synth = nn.functional.softmax(y_htr_pred_synth, 2)
+        # y_htr_pred_synth_max = torch.max(y_htr_pred_synth, dim=2).indices
+
+        # y_htr_pred_synth_max = y_htr_pred_synth_max.cpu().numpy()
+        # y_pred_max = y_pred_max.cpu().numpy()
+        # y_htr_pred_synth_labels = [tokenizer.decode(label) for label in y_htr_pred_synth_max]
+
+        # synth_imgs = synth_imgs.detach().cpu()
+
+        # for idx in range(len(y_htr_pred_synth_max)):
+        #     if not np.array_equal(y_htr_pred_synth_max[idx],y_pred_max[idx]):
+        #         print("not same")
+        #         print(y_pred_max[idx])
+        #         print(y_htr_pred_synth_max[idx])
+        #         print(y_pred_labels[idx], y_htr_pred_synth_labels[idx])
+                
+        #         plt.imshow(synth_imgs[idx][0])
+        #         plt.show()
+        #     else:
+        #         print("same")
+
+        # synth_imgs = synth_imgs.detach().cpu()
+
+        # y_htr_pred = y_htr_pred.detach().cpu()
+
+    
+        # y_pred = [tokenizer.decode(label) for label in y_pred_max]
+        # gt_labels = gt_labels.detach().cpu().numpy()
+        # gt_labels = [tokenizer.decode(label) for label in gt_labels]
+        # print(y_pred[0], gt_labels[0])
+
+
         loss = self.loss.loss_func(synth_imgs, gen_imgs[:,0,:,:])
         # print(loss)
 
@@ -253,7 +304,7 @@ class HTRtrainer(object):
             n_valid_batches = len(valid_loader)
             
             if self.scheduler is not None:
-                self.scheduler.step(avg_loss/n_valid_batches)
+                self.scheduler.step()
 
             if self.scheduler is not None:
                 # print("learning rate: ", self.scheduler.get_last_lr())

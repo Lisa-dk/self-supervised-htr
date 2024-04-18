@@ -7,7 +7,7 @@ import time
 import argparse
 from data.tokenizer import Tokenizer
 import string
-from data.reader import read_rimes
+from data.reader import read_rimes, read_iam_subset
 import data.preproc
 # from data.preproc import preproc_iam, preproc_rimes
 from network.models import Puigcerver, Puigcerver_Dropout, Puigcerver_supervised
@@ -17,6 +17,7 @@ import editdistance
 from torchaudio.models.decoder import ctc_decoder
 from tqdm import tqdm
 from network.gen_model.gen_model import GenModel_FC
+from sklearn.model_selection import StratifiedKFold
 
 
 
@@ -25,6 +26,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=str, required=True)
     parser.add_argument("--self_supervised", action="store_true", default=False)
+    parser.add_argument("--subset" , action="store_true", default=False)
+    parser.add_argument("--fold" , type=int, default=0)
 
     parser.add_argument("--preproc", action="store_true", default=False)
 
@@ -45,14 +48,18 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    dataset_path = os.path.join("..", "data", args.dataset, "words")
+    if args.subset:
+        dataset_path = os.path.join("..", "subset", args.dataset, "words")
+    else:
+        dataset_path = os.path.join("..", "data", args.dataset, "words")
 
-    # preprocess data: resizing
-    if args.preproc:
-        print("Preparing data...")
-        path_from = os.path.join("..", "raw", args.dataset)
-        os.makedirs(dataset_path, exist_ok=True)
-        getattr(data.preproc, f"preproc_{args.dataset}")(path_from, dataset_path)
+
+        # preprocess data: resizing
+        if args.preproc:
+            print("Preparing data...")
+            path_from = os.path.join("..", "raw", args.dataset)
+            os.makedirs(dataset_path, exist_ok=True)
+            getattr(data.preproc, f"preproc_{args.dataset}")(path_from, dataset_path)
 
 
     # os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
@@ -73,7 +80,12 @@ if __name__ == "__main__":
     
     # get data paths and labels (path, label)
     # TODO: change function name to sth general
-    data_train, data_valid, data_test, wid_train, wid_valid, wid_test = read_rimes(dataset_path, args.max_word_len)
+
+    if args.subset:
+        print("Fold", args.fold)
+        data_train, data_valid, data_test, wid_train, wid_valid, wid_test = read_iam_subset(dataset_path, args.max_word_len, n_fold=args.fold)
+    else:
+        data_train, data_valid, data_test, wid_train, wid_valid, wid_test = read_rimes(dataset_path, args.max_word_len)
 
     data_train = RIMES_data(data_train, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_train)
     data_valid = RIMES_data(data_valid, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_valid)
@@ -89,7 +101,10 @@ if __name__ == "__main__":
             
             if args.self_supervised:
                 htr_model = Puigcerver(input_size=input_size, d_model=tokenizer.vocab_size)
-                folder_name =f"{args.dataset}/{args.loss}-{args.vgg_layer}-{args.max_word_len}char-adam-lr001-lin" if "vgg" in args.loss else f"{args.dataset}/{args.loss}-{args.max_word_len}char-adam-lr001"
+                if args.subset:
+                    folder_name = f"{args.dataset}/{args.loss}-{args.vgg_layer}-{args.max_word_len}char-fold{args.fold}" if "vgg" in args.loss else f"{args.dataset}/{args.loss}-{args.max_word_len}char-fold{args.fold}"
+                else:
+                    folder_name =f"{args.dataset}/{args.loss}-{args.vgg_layer}-{args.max_word_len}char-adam-lr001-lin" if "vgg" in args.loss else f"{args.dataset}/{args.loss}-{args.max_word_len}char-adam-lr001"
                 model_name = f"./htr_models/{folder_name}/htr_model_self_supervised-{args.start_epoch}.model"
                 print(model_name)
                 
@@ -201,7 +216,7 @@ if __name__ == "__main__":
     elif args.test_supervised:
 
         htr_model = Puigcerver_supervised(input_size=input_size, d_model=tokenizer.vocab_size).cuda()
-        model_name = f"./network/htr_model_supervised-50.model"
+        model_name = f"./network/htr_model_supervised-60.model"
         
         if os.path.exists(model_name):
                 print("Loading model: ", model_name)
