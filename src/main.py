@@ -39,7 +39,7 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument('--start_epoch', type=int, default=0)
 
-    parser.add_argument("--batch_size", type=int, default=8)
+    parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--loss", type=str, default="ctc")
     parser.add_argument("--pretrained", action="store_true", default=False)
 
@@ -105,7 +105,7 @@ if __name__ == "__main__":
                     folder_name = f"{args.dataset}/{args.loss}-{args.vgg_layer}-{args.max_word_len}char-fold{args.fold}" if "vgg" in args.loss else f"{args.dataset}/{args.loss}-{args.max_word_len}char-fold{args.fold}"
                 else:
                     folder_name =f"{args.dataset}/{args.loss}-{args.vgg_layer}-{args.max_word_len}char-adam-lr001-lin" if "vgg" in args.loss else f"{args.dataset}/{args.loss}-{args.max_word_len}char-adam-lr001"
-                model_name = f"./htr_models/{folder_name}/htr_model_self_supervised-{args.start_epoch}.model"
+                model_name = f"./htr_models/{folder_name}/htr_model_self_supervised-{args.start_epoch - 1}.model"
                 print(model_name)
                 
             else:
@@ -130,8 +130,8 @@ if __name__ == "__main__":
         if args.self_supervised:
             optimizer = torch.optim.Adam(htr_model.parameters(), lr=0.001)
             #optimizer = torch.optim.RMSprop(htr_model.parameters(), lr=0.001, momentum=0.9)
-            scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, 1.0, 0.25, 50)
-            #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=5, verbose=True)
+            # scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, 1.0, 0.25, 50)
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=5, verbose=True)
         else:
             optimizer = torch.optim.Adam(htr_model.parameters(), lr=0.0001)
             #optimizer = torch.optim.RMSprop(htr_model.parameters(), lr=0.0001, momentum=0.9)
@@ -214,9 +214,12 @@ if __name__ == "__main__":
 
         print(f"CER: {cer / total}, WER: {wer / total}")   
     elif args.test_supervised:
+        charset_base = string.ascii_lowercase + string.ascii_uppercase
+    
+        tokenizer = Tokenizer(chars=charset_base, max_text_length=max_text_length, self_supervised=True)
 
         htr_model = Puigcerver_supervised(input_size=input_size, d_model=tokenizer.vocab_size).cuda()
-        model_name = f"./network/htr_model_supervised-60.model"
+        model_name = f"./network/htr_model_supervised-ce-40.model"
         
         if os.path.exists(model_name):
                 print("Loading model: ", model_name)
@@ -226,11 +229,19 @@ if __name__ == "__main__":
             print("Model not found")
             exit()
 
-        gen_model = GenModel_FC(tokenizer.maxlen, tokenizer.vocab_size - 1, tokenizer.PAD)
-        # self.gen_model.load_state_dict(torch.load('./network/gen_model/gen_model-15all.model')) #load
-        gen_model.load_state_dict(torch.load('./network/gen_model/gen_model-25half.model'))
-        gen_model.eval()
-        gen_model.to(device)
+        beam_search_decoder = ctc_decoder(lexicon=None,
+                tokens=[char for char in tokenizer.chars + "|" + '#'],
+                nbest=1,
+                beam_size=50,
+                blank_token = "#",
+                sil_token = "|"
+            )
+
+        # gen_model = GenModel_FC(tokenizer.maxlen, tokenizer.vocab_size - 1, tokenizer.PAD)
+        # # self.gen_model.load_state_dict(torch.load('./network/gen_model/gen_model-15all.model')) #load
+        # gen_model.load_state_dict(torch.load('./network/gen_model/gen_model-25half.model'))
+        # gen_model.eval()
+        # gen_model.to(device)
 
         cer = 0
         wer = 0
@@ -256,6 +267,9 @@ if __name__ == "__main__":
             gt_labels = gt_labels.detach().cpu().numpy()
             gt_labels = [tokenizer.decode(label) for label in gt_labels]
             y_pred = [tokenizer.decode(label) for label in y_pred_max]
+
+            # beam_search = beam_search_decoder(y_pred_soft)
+            # y_pred_bs = [tokenizer.decode(label[0].tokens * (label[0].tokens < 57)) for label in beam_search]
             
             for (pd, gt) in zip(y_pred, gt_labels):
                 pd_cer, gt_cer = list(pd), list(gt)

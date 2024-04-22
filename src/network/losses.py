@@ -48,10 +48,13 @@ class Loss:
             return self.prof_loss
         
         elif loss_input.lower() == "htr":
-            self.iam_model = Puigcerver_supervised((64, 216, 1), self.tokenizer.vocab_size + 1)
-            model_name = f"./network/htr_model_supervised-60.model"
+            self.iam_model = Puigcerver_supervised((64, 216, 1), self.tokenizer.vocab_size)
+            model_name = f"./network/htr_model_supervised-ce-40.model"
             self.iam_model.load_state_dict(torch.load(model_name))
             self.iam_model = self.iam_model.to(self.device)
+            self.iam_model.cnn.eval()
+            self.iam_model.dropout1.eval()
+            self.iam_model.dropout2.eval()
 
             for param in self.iam_model.parameters():
                 param.requires_grad = False
@@ -140,18 +143,18 @@ class Loss:
 
         gt_feats = self.iam_model(gt_imgs.squeeze(0).unsqueeze(1))
         gt_feats = nn.functional.softmax(gt_feats, 2)
-        y_pred_max, _ = torch.max(gt_feats, dim=2, keepdim=True)
-        y_pred_max = gt_feats / y_pred_max
+        # y_pred_max, _ = torch.max(gt_feats, dim=2, keepdim=True)
+        # y_pred_max = gt_feats / y_pred_max
 
-        mask = (y_pred_max >= 1.0).float()
-        y_pred_max = y_pred_max * mask
+        # mask = (y_pred_max >= 1.0).float()
+        # y_pred_max = y_pred_max * mask
 
-        y_pred_max_flat = y_pred_max.view(-1, 57)
+        y_pred_max_flat = gt_feats.view(-1, 56)
 
         synth_feats =  self.iam_model(synth_imgs)
-        synth_feats_flat = synth_feats.view(-1, 57)
+        synth_feats_flat = synth_feats.view(-1, 56)
         
-        return nn.functional.cross_entropy(synth_feats_flat, y_pred_max_flat)
+        return nn.functional.cross_entropy(synth_feats_flat, y_pred_max_flat), gt_feats, nn.functional.softmax(synth_feats, 2)
     
     def vgg_prof(self, synth_imgs, gt_imgs):
         synth_imgs = synth_imgs.squeeze(1)

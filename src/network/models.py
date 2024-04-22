@@ -35,7 +35,7 @@ class Puigcerver(nn.Module):
         )
         self.cnn.apply(self.weights_init)
 
-        self.blstm = nn.LSTM(input_size=640, hidden_size=256, num_layers=5, bidirectional=True, batch_first=True)#, dropout=0.5)
+        self.blstm = nn.LSTM(input_size=80, hidden_size=256, num_layers=5, bidirectional=True, batch_first=True)#, dropout=0.5)
         # self.dropout = nn.Dropout(0.5)
         # self.fc1 = nn.Linear(256, 512)
         self.fc = nn.Linear(512, d_model)
@@ -49,13 +49,16 @@ class Puigcerver(nn.Module):
 
     def forward(self, x):
         x = self.cnn(x)
+
         batch_size, channels, width, height = x.size()
-        x = x.view(batch_size, height, width * channels)
-        # print(x.shape)
-        x, _ = self.blstm(x)
-        # x = self.fc(self.dropout(x))
+        #x = x.view(batch_size, height, width * channels)
+        x = nn.functional.max_pool2d(x, [x.size(2), 1], stride=[x.size(2), 1], padding=[0, 1//2])
+        x = x.permute(2, 0, 3, 1)[0]
+
+        x = self.blstm(x)[0]
+
         x = self.fc(x)
-        # x = self.fc2(self.fc1(x))
+
         return x
     
 class Puigcerver_supervised(nn.Module):
@@ -92,7 +95,7 @@ class Puigcerver_supervised(nn.Module):
         )
         self.cnn.apply(self.weights_init)
 
-        self.blstm = nn.LSTM(input_size=640, hidden_size=256, num_layers=5, bidirectional=True, batch_first=True, dropout=0.5)
+        self.blstm = nn.LSTM(input_size=80, hidden_size=256, num_layers=5, bidirectional=True, batch_first=True, dropout=0.0)
         self.dropout1 = nn.Dropout(0.5)
         self.fc1 = nn.Linear(512, 256)
         self.dropout2 = nn.Dropout(0.5)
@@ -110,9 +113,11 @@ class Puigcerver_supervised(nn.Module):
         x = self.cnn(x)
 
         batch_size, channels, width, height = x.size()
-        x = x.view(batch_size, height, width * channels)
+        #x = x.view(batch_size, height, width * channels)
+        x = nn.functional.max_pool2d(x, [x.size(2), 1], stride=[x.size(2), 1], padding=[0, 1//2])
+        x = x.permute(2, 0, 3, 1)[0]
 
-        x, _ = self.blstm(x)
+        x = self.blstm(x)[0]
 
         x = self.fc1(self.dropout1(x))
         x = self.fc2(self.dropout2(x))
