@@ -49,11 +49,13 @@ class Puigcerver(nn.Module):
 
     def forward(self, x):
         x = self.cnn(x)
+        print(x.shape)
 
         batch_size, channels, width, height = x.size()
         #x = x.view(batch_size, height, width * channels)
         x = nn.functional.max_pool2d(x, [x.size(2), 1], stride=[x.size(2), 1], padding=[0, 1//2])
         x = x.permute(2, 0, 3, 1)[0]
+        print(x.shape)
 
         x = self.blstm(x)[0]
 
@@ -111,11 +113,13 @@ class Puigcerver_supervised(nn.Module):
 
     def forward(self, x):
         x = self.cnn(x)
+        print(x.shape)
 
         batch_size, channels, width, height = x.size()
         #x = x.view(batch_size, height, width * channels)
         x = nn.functional.max_pool2d(x, [x.size(2), 1], stride=[x.size(2), 1], padding=[0, 1//2])
         x = x.permute(2, 0, 3, 1)[0]
+        print(x.shape)
 
         x = self.blstm(x)[0]
 
@@ -177,6 +181,7 @@ class Puigcerver_Dropout(nn.Module):
 
         batch_size, channels, width, height = x.size()
         x = x.view(batch_size, height, width * channels)
+        print(x.shape)
 
         x, _ = self.blstm(x)
         # x = self.fc1(self.dropout1(x))

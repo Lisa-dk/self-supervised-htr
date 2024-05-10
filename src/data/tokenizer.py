@@ -5,12 +5,12 @@ import numpy as np
 class Tokenizer():
     """Manager tokens functions and charset/dictionary properties"""
 
-    def __init__(self, chars, max_text_length=10, self_supervised=True):
+    def __init__(self, chars, max_text_length=10, ctc=False):
         self.PAD_TK, self.UNK_TK = "¶", "¤"
         self.GO_TK, self.END_TK = "♂", "♀"
-        self.self_supervised = self_supervised
+        self.ctc = ctc
         # ctc loss requires an extra blank token
-        if not self_supervised:
+        if ctc:
             self.BLAN_TK = '#'
             self.chars = (self.GO_TK + self.END_TK + self.PAD_TK + self.UNK_TK + chars + self.BLAN_TK)
             self.BLANK = self.chars.find(self.BLAN_TK)
@@ -58,7 +58,7 @@ class Tokenizer():
 
     def remove_tokens(self, text):
         """Remove tokens (PAD, UNK, GO, END, BLANK) from text"""
-        if self.self_supervised:
+        if not self.ctc:
             return text.replace(self.PAD_TK, "").replace(self.UNK_TK, "").replace(self.GO_TK, "").replace(self.END_TK, "")
         else:
             return text.replace(self.PAD_TK, "").replace(self.UNK_TK, "").replace(self.GO_TK, "").replace(self.END_TK, "").replace(self.BLAN_TK, "")

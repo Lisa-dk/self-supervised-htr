@@ -21,6 +21,9 @@ class Loss:
         if loss_input.lower() == "ctc":
             self.ctc_loss = nn.CTCLoss(blank=self.tokenizer.BLANK, zero_infinity=True)
             return self.ctc_loss_func
+
+        if loss_input.lower() == "ce":
+            return self.ce_loss
         
         elif loss_input.lower() == "ssim":
             self.ssim = StructuralSimilarityIndexMeasure(data_range=(-1.0, 1.0)).to(self.device)
@@ -34,6 +37,10 @@ class Loss:
             self.vgg_model.to(self.device)
             print(self.vgg_model)
             self.vgg_model.eval()
+
+            for param in self.vgg_model.parameters():
+                param.requires_grad = False
+
             return self.perceptual_loss_func
         
         elif loss_input.lower() == "vgg_ssim":
@@ -42,6 +49,10 @@ class Loss:
             self.vgg_model.to(self.device)
             print(self.vgg_model)
             self.vgg_model.eval()
+
+            for param in self.vgg_model.parameters():
+                param.requires_grad = False
+
             return self.vgg_ssim_loss
         
         elif loss_input.lower() == "pp":
@@ -66,6 +77,10 @@ class Loss:
             self.vgg_model.to(self.device)
             print(self.vgg_model)
             self.vgg_model.eval()
+
+            for param in self.vgg_model.parameters():
+                param.requires_grad = False
+
             return self.vgg_prof
         
         elif loss_input.lower() == "siamese":
@@ -73,11 +88,24 @@ class Loss:
             self.feat_model.load_state_dict(torch.load('../src/network/sia_model/resnet34-RMS-6.model'))
             self.feat_model.to(self.device)
             self.feat_model.eval()
+
+            for param in self.feat_model.parameters():
+                param.requires_grad = False
+
             return self.siamese_loss
         else:
             print("Loss not implemented. Choose one of: ctc, ssim, perceptual")
             exit()
     
+    def ce_loss(self, y_pred, gt_labels):
+        gt_labels_1hot = gt_labels.long()
+        gt_labels_1hot = torch.nn.functional.one_hot(gt_labels_1hot, self.tokenizer.vocab_size).float()
+
+        y_pred = y_pred.view(-1, self.tokenizer.vocab_size)
+        gt_labels_1hot = gt_labels_1hot.view(-1, self.tokenizer.vocab_size)
+
+        return nn.functional.cross_entropy(y_pred, gt_labels_1hot)
+
     def ctc_loss_func(self, y_pred, gt_labels):
 
         y_pred_log = nn.functional.log_softmax(y_pred, dim=2)
@@ -149,10 +177,10 @@ class Loss:
         # mask = (y_pred_max >= 1.0).float()
         # y_pred_max = y_pred_max * mask
 
-        y_pred_max_flat = gt_feats.view(-1, 56)
+        y_pred_max_flat = gt_feats.view(-1, self.tokenizer.vocab_size)
 
         synth_feats =  self.iam_model(synth_imgs)
-        synth_feats_flat = synth_feats.view(-1, 56)
+        synth_feats_flat = synth_feats.view(-1, self.tokenizer.vocab_size)
         
         return nn.functional.cross_entropy(synth_feats_flat, y_pred_max_flat), gt_feats, nn.functional.softmax(synth_feats, 2)
     

@@ -18,15 +18,20 @@ from torchaudio.models.decoder import ctc_decoder
 from tqdm import tqdm
 from network.gen_model.gen_model import GenModel_FC
 from sklearn.model_selection import StratifiedKFold
+sys.path.append('../../')
+sys.path.append('../src')
+sys.path.append('../../GANwriting')
+sys.path.append('../GANwriting/corpora_english')
 
 
 
 if __name__ == "__main__":
-    max_text_length = 25
+    max_text_length = 10
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=str, required=True)
     parser.add_argument("--self_supervised", action="store_true", default=False)
     parser.add_argument("--subset" , action="store_true", default=False)
+    parser.add_argument("--synth", action="store_true", default=False)
     parser.add_argument("--fold" , type=int, default=0)
 
     parser.add_argument("--preproc", action="store_true", default=False)
@@ -34,6 +39,7 @@ if __name__ == "__main__":
     parser.add_argument("--train", action="store_true", default=False)
     parser.add_argument("--test", action="store_true", default=False)
     parser.add_argument("--valid", action="store_true", default=False)
+    parser.add_argument("--beam_search", action="store_true", default=False)
     parser.add_argument("--test_supervised", action="store_true", default=False)
 
     parser.add_argument("--epochs", type=int, default=100)
@@ -57,10 +63,15 @@ if __name__ == "__main__":
         # preprocess data: resizing
         if args.preproc:
             print("Preparing data...")
-            path_from = os.path.join("..", "raw", args.dataset)
             os.makedirs(dataset_path, exist_ok=True)
-            getattr(data.preproc, f"preproc_{args.dataset}")(path_from, dataset_path)
 
+            path_from = os.path.join("..", "raw", args.dataset)
+            if args.dataset == "iam_gan":
+                path_from = os.path.join("..", "..", "htr_self_supervised", "htr_self_supervised", "GANwriting")
+                getattr(data.preproc, f"preproc_iam")(path_from, dataset_path)
+            else:
+                getattr(data.preproc, f"preproc_{args.dataset}")(path_from, dataset_path)
+            
 
     # os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -69,8 +80,12 @@ if __name__ == "__main__":
     num_style_imgs = 25 # num imgs for generator to extract style from
 
     charset_base = string.ascii_lowercase + string.ascii_uppercase
-    
-    tokenizer = Tokenizer(chars=charset_base, max_text_length=max_text_length, self_supervised=args.self_supervised)
+    max_padding = 25 # set to num timesteps (i.e. width final feature map of model) 
+
+    if args.loss == "ctc":
+        tokenizer = Tokenizer(chars=charset_base, max_text_length=max_padding, ctc=True) # ctc loss requires an extra blank symbol
+    else:
+        tokenizer = Tokenizer(chars=charset_base, max_text_length=max_padding, ctc=False)
 
     # definitions for generator
     num_classes = len(charset_base)
@@ -83,17 +98,25 @@ if __name__ == "__main__":
 
     if args.subset:
         print("Fold", args.fold)
-        data_train, data_valid, data_test, wid_train, wid_valid, wid_test = read_iam_subset(dataset_path, args.max_word_len, n_fold=args.fold)
+        data_train, data_valid, data_test, wid_train, wid_valid, wid_test = read_iam_subset(dataset_path, args.max_word_len, n_fold=args.fold, synth=args.synth)
+        data_test = RIMES_data(data_test, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_test)
+        test_loader = torch.utils.data.DataLoader(data_test, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
+    elif args.dataset == "iam_gan":
+        data_train, data_valid, wid_train, wid_valid = read_rimes(dataset_path, args.max_word_len, synth=args.synth)
     else:
-        data_train, data_valid, data_test, wid_train, wid_valid, wid_test = read_rimes(dataset_path, args.max_word_len)
+        data_train, data_valid, data_test, oov_data_train, oov_data_valid, oov_data_test, wid_train, wid_valid, wid_test, oov_wid_train, oov_wid_valid, oov_wid_test = read_rimes(dataset_path, args.max_word_len, synth=args.synth)
+        oov_data_valid = RIMES_data(oov_data_valid, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_valid)
+        data_test = RIMES_data(data_test, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_test)
+        oov_valid_loader = torch.utils.data.DataLoader(oov_data_valid, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
+        test_loader = torch.utils.data.DataLoader(data_test, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
+
 
     data_train = RIMES_data(data_train, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_train)
     data_valid = RIMES_data(data_valid, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_valid)
-    data_test = RIMES_data(data_test, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_test)
 
     train_loader = torch.utils.data.DataLoader(data_train, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=4)
     valid_loader = torch.utils.data.DataLoader(data_valid, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
-    test_loader = torch.utils.data.DataLoader(data_test, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
+    
 
     if args.train:
         
@@ -109,7 +132,7 @@ if __name__ == "__main__":
                 print(model_name)
                 
             else:
-                htr_model = Puigcerver_Dropout(input_size=input_size, d_model=tokenizer.vocab_size)
+                htr_model = Puigcerver_supervised(input_size=input_size, d_model=tokenizer.vocab_size)
                 folder_name = f"{args.dataset}/{args.loss}-{args.max_word_len}-chars-rms-lr0001-dense"
                 model_name = f"./htr_models/{folder_name}/htr_model_supervised-{args.start_epoch}.model"
                 print(model_name)
@@ -118,8 +141,8 @@ if __name__ == "__main__":
                 print("loading model: ", model_name)
                 htr_model.load_state_dict(torch.load(model_name)) #load
         else:
-            htr_model = Puigcerver_Dropout(input_size=input_size, d_model=tokenizer.vocab_size + 1)
-            model_name = f"./htr_models/iam/ctc/htr_model_supervised-40.model"
+            htr_model = Puigcerver_Dropout(input_size=input_size, d_model=tokenizer.vocab_size)
+            model_name = f"./htr_models/iam/ce/htr_model_supervised-40.model"
             folder_name = f"{args.dataset}/{args.loss}-{args.vgg_layer}-{args.max_word_len}chars-adam-lr001" if "vgg" in args.loss else f"{args.loss}-{args.max_word_len}chars-adam-lr001"
             if os.path.exists(model_name):
                 print("loading pretrained model model: ", model_name)
@@ -138,7 +161,10 @@ if __name__ == "__main__":
             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.2, patience=5, verbose=True)
 
         trainer = HTRtrainer(htr_model, optimizer=optimizer, lr_scheduler=scheduler, device=device, tokenizer=tokenizer, loss_name=args.loss, self_supervised=args.self_supervised, folder_name=folder_name, vgg_layer=args.vgg_layer)
-        trainer.train_model(train_loader=train_loader, valid_loader=valid_loader, epochs=(args.start_epoch, args.epochs))
+        if args.dataset == "iam_gan" or args.subset:
+            trainer.train_model(train_loader=train_loader, valid_loader=valid_loader, oov_valid_loader=None, epochs=(args.start_epoch, args.epochs))
+        else:
+            trainer.train_model(train_loader=train_loader, valid_loader=valid_loader, oov_valid_loader=oov_valid_loader, epochs=(args.start_epoch, args.epochs))
 
     elif args.test or args.valid:
         if args.test:
@@ -163,15 +189,24 @@ if __name__ == "__main__":
         else:
             #model_name = f"./htr_models/{folder_name}/htr_model_supervised-{args.start_epoch}.model"
             htr_model = Puigcerver_Dropout(input_size=input_size, d_model=tokenizer.vocab_size).cuda()
-            model_name = f"./htr_models/iam/ctc/htr_model_supervised-40.model"
+            model_name = f"./htr_models/iam/ctc/htr_model_supervised-ce-40.model"
             # from torchaudio, so uses a silent token
-            beam_search_decoder = ctc_decoder(lexicon=None,
-                tokens=[char for char in tokenizer.chars + "|"],
+            if args.loss == "ctc":
+                beam_search_decoder = ctc_decoder(lexicon=None,
+                    tokens=[char for char in tokenizer.chars + "|"],
+                    nbest=1,
+                    beam_size=50,
+                    blank_token = "#",
+                    sil_token = "|"
+                )
+            else:
+                beam_search_decoder = ctc_decoder(lexicon=None,
+                tokens=[char for char in tokenizer.chars + "|" + '#'],
                 nbest=1,
                 beam_size=50,
                 blank_token = "#",
                 sil_token = "|"
-            )
+                )
         
         if os.path.exists(model_name):
                 print("Loading model: ", model_name)
@@ -180,7 +215,6 @@ if __name__ == "__main__":
         else:
             print("Model not found")
             exit()
-
 
         cer = 0
         wer = 0
@@ -197,11 +231,12 @@ if __name__ == "__main__":
             gt_labels = gt_labels.detach().cpu().numpy()
             gt_labels = [tokenizer.decode(label) for label in gt_labels]
             y_pred = [tokenizer.decode(label) for label in y_pred_max]
-            
-            beam_search = beam_search_decoder(y_pred_soft)
-            y_pred_bs = [tokenizer.decode(label[0].tokens * (label[0].tokens < 57)) for label in beam_search]
 
-            for (pd, gt) in zip(y_pred_bs, gt_labels):
+            if beam_search:
+                beam_search = beam_search_decoder(y_pred_soft)
+                y_pred = [tokenizer.decode(label[0].tokens * (label[0].tokens < 57)) for label in beam_search]
+
+            for (pd, gt) in zip(y_pred, gt_labels):
                 pd_cer, gt_cer = list(pd), list(gt)
                 dist = editdistance.eval(pd_cer, gt_cer)
                 

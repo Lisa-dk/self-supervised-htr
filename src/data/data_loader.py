@@ -66,7 +66,7 @@ class RIMES_data(D.Dataset):
 
         label = self.tokenizer.encode(label)
         
-        return img, gen_input, np.asarray(label), wid
+        return img, gen_input, np.asarray(label), wid, img_path
     
     def __len__(self):
         return len(self.img_paths)

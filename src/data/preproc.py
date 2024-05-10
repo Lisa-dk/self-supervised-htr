@@ -164,16 +164,25 @@ def preproc_iam_prev(folder_from, folder_to) -> None:
 
 def preproc_iam(folder_from, folder_to) -> None:
     """Read IAM words from given folder and save preprocessed images to new folder"""
-    partitions = ['train', 'valid', 'test']
-
     pt_path = os.path.join(folder_from, "Groundtruth")
-    
-    paths = {"train": open(os.path.join(pt_path, "htr.iam.train_noval.filter27")).read().splitlines(),
-                "valid": open(os.path.join(pt_path, "htr.iam.val.filter27")).read().splitlines(),
-                "test": open(os.path.join(pt_path, "htr.iam.test.filter27")).read().splitlines()}
+
+    if "GANwriting" in folder_from:
+        partitions = ['train', 'valid']
+        paths = {"train": open(os.path.join(pt_path, "gan.iam.gan_tr_va.filter27")).read().splitlines(),
+                    "valid": open(os.path.join(pt_path, "gan.iam.gan_test.filter27")).read().splitlines()}
+    else:
+        partitions = ['train', 'valid', 'test', 'oov_train', 'oov_valid', 'oov_test']
+        paths = {"train": open(os.path.join(pt_path, "htr.iam.train.filter27")).read().splitlines(),
+                    "valid": open(os.path.join(pt_path, "htr.iam.val.filter27")).read().splitlines(),
+                    "test": open(os.path.join(pt_path, "htr.iam.test.filter27")).read().splitlines(),
+                    "oov_train": open(os.path.join(pt_path, "htr.iam.oov_train.filter27")).read().splitlines(),
+                    "oov_valid": open(os.path.join(pt_path, "htr.iam.oov_val.filter27")).read().splitlines(),
+                    "oov_test": open(os.path.join(pt_path, "htr.iam.oov_test.filter27")).read().splitlines()}
 
     for i in partitions:
+        print(i)
         new_file_name = os.path.join(folder_to, f"ground_truth_{i}_filtered.txt")
+        new_data_file = open(new_file_name, 'w', encoding="utf-8")
         for line in paths[i]:
             try:
                 wid_path, gt_label = line.split(' ')
@@ -191,24 +200,31 @@ def preproc_iam(folder_from, folder_to) -> None:
                 # skip words with digits
                 if not set(string.digits).isdisjoint(set(gt_label)):
                     continue
-
-                img_path_from = os.path.join(folder_from, "words", img_path)
-
-                img = cv2.imread(img_path_from, cv2.IMREAD_GRAYSCALE)
-                img = img_padding(img, INPUT_SIZE[1])
-                img = resize(img, INPUT_SIZE)
-
-                f1, f2, _ = img_path.split('\\')
+                
+                if "GANwriting" in folder_from:
+                    img_path_from = os.path.join(folder_from, "data", "iam", "words", img_path + ".png") 
+                    f1, f2, _, _ =  img_path.split('-')
+                    new_img_path = os.path.join(folder_to, i, img_path + ".png")
+                else: 
+                    img_path_from = os.path.join(folder_from, "words", img_path)
+                    f1, f2, _ = img_path.split('\\')
+                    new_img_path = os.path.join(folder_to, i, img_path)
 
                 os.makedirs(os.path.join(folder_to, i, f1, f2), exist_ok=True)
-                new_img_path = os.path.join(folder_to, i, img_path)
-                cv2.imwrite(new_img_path, img)
+                print(img_path_from)
+                
+                img = cv2.imread(img_path_from, cv2.IMREAD_GRAYSCALE)
+                if img is not None:
+                    img = img_padding(img, INPUT_SIZE[1])
+                    img = resize(img, INPUT_SIZE)
 
-                with open(new_file_name, mode="a", encoding="utf-8") as new_data_file:
+                    cv2.imwrite(new_img_path, img)
+
                     new_data_file.write(f"{new_img_path} {gt_label} {wid}\n")
 
             except KeyError:
                 pass
+        new_data_file.close()
         
 
 def main():
