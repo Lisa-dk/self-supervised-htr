@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    dataset_path = os.path.join("..", "data", "iam", "words")
+    dataset_path = os.path.join("..", "data", "iam_gan", "words")
 
     os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -41,7 +41,7 @@ if __name__ == "__main__":
     input_size = (64, 216, 1)
     
     # get data paths and labels (path, label, wid)
-    data_train, data_valid, data_test, valid_oov, test_oov = read_data(dataset_path)
+    data_train, data_valid, data_test = read_data(dataset_path)
 
     print(data_train[0])
     print(data_valid[0])
@@ -51,15 +51,11 @@ if __name__ == "__main__":
     data_train = IAM_data(data_train)
     data_valid = IAM_data(data_valid)
     data_test = IAM_data(data_test)
-    valid_oov = IAM_data(valid_oov)
-    test_oov = IAM_data(test_oov)
 
     num_workers = 4
     train_loader = torch.utils.data.DataLoader(data_train, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=num_workers)
     valid_loader = torch.utils.data.DataLoader(data_valid, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=num_workers)
     test_loader = torch.utils.data.DataLoader(data_test, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=num_workers)
-    valid_oov_loader = torch.utils.data.DataLoader(valid_oov, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=num_workers)
-    test_oov_loader = torch.utils.data.DataLoader(test_oov, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=num_workers)
     
     model = SiameseNetwork(model_name=args.model, edisdist=args.editdistance)
     # model.load_state_dict(torch.load(f'./models/results/{args.model}-19.model'))
@@ -68,36 +64,32 @@ if __name__ == "__main__":
 
     if args.train:
         if args.editdistance:
-            trainer = Trainer(model, device, "./results/semisup/", args.model + "-RMS-edit", args.editdistance)
+            trainer = Trainer(model, device, "./results/", args.model + "-RMS-edit", args.editdistance)
         else:
-            trainer = Trainer(model, device, "./results/semisup/", args.model + "-RMS", args.editdistance)
-        trainer.train_model(train_loader, (valid_loader, valid_oov_loader), epochs)
+            trainer = Trainer(model, device, "./results/", args.model + "-RMS", args.editdistance)
+        trainer.train_model(train_loader, valid_loader, epochs)
 
     elif args.test or args.valid:
-        model.load_state_dict(torch.load(f'./models/results/{args.model}-2.model'))
+        model.load_state_dict(torch.load(f'./models/results/{args.model}-RMS-24.model'))
         model.eval()
-        trainer = Trainer(model, device, "./results/")
+        trainer =  Trainer(model, device, "./results/", args.model + "-RMS", args.editdistance)
 
         if args.test:
             loader = test_loader
-            oov_loader = test_oov_loader
         elif args.valid:
             loader = valid_loader
-            oov_loader = valid_oov_loader
-        
+
         avg_loss = 0
+        pos_dists = []
+        neg_dists = []
         for idx, batch in tqdm(enumerate(loader)):
-            loss, img1, img2, labels = trainer.validate(batch)
+            loss, img1, img2, labels, pos, neg = trainer.validate(batch)
             # print(loss)
             avg_loss += loss
+            pos_dists.append(pos)
+            neg_dists.append(neg)
+        
 
-        print(f"mean validation loss: {avg_loss/len(loader)}")
-
-        avg_loss = 0
-        for idx, batch in tqdm(enumerate(oov_loader)):
-            loss, img1, img2, labels = trainer.validate(batch)
-            # print(loss)
-            avg_loss += loss
-
-        print(f"mean oov validation loss epoch: {avg_loss/len(oov_loader)}")
+        diff = [neg_dists[i] - pos_dists[i] for i in range(len(neg_dists))]
+        print(f"mean validation loss: {avg_loss/len(loader)} mean pos dist: {np.mean(pos_dists)} pm {np.std(pos_dists)} mean neg dist: {np.mean(neg_dists)} pm {np.std(neg_dists)} mean diff: {np.mean(diff)} pm {np.std(diff)}")
 

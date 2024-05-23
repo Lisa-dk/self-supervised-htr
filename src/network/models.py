@@ -49,13 +49,11 @@ class Puigcerver(nn.Module):
 
     def forward(self, x):
         x = self.cnn(x)
-        print(x.shape)
 
         batch_size, channels, width, height = x.size()
         #x = x.view(batch_size, height, width * channels)
         x = nn.functional.max_pool2d(x, [x.size(2), 1], stride=[x.size(2), 1], padding=[0, 1//2])
         x = x.permute(2, 0, 3, 1)[0]
-        print(x.shape)
 
         x = self.blstm(x)[0]
 
@@ -98,10 +96,10 @@ class Puigcerver_supervised(nn.Module):
         self.cnn.apply(self.weights_init)
 
         self.blstm = nn.LSTM(input_size=80, hidden_size=256, num_layers=5, bidirectional=True, batch_first=True, dropout=0.0)
-        self.dropout1 = nn.Dropout(0.5)
-        self.fc1 = nn.Linear(512, 256)
+        # self.dropout1 = nn.Dropout(0.5)
+        # self.fc1 = nn.Linear(512, 256)
         self.dropout2 = nn.Dropout(0.5)
-        self.fc2 = nn.Linear(256, d_model)
+        self.fc2 = nn.Linear(512, d_model)
 
     
     def replace_head(self, new_d_model):
@@ -113,17 +111,17 @@ class Puigcerver_supervised(nn.Module):
 
     def forward(self, x):
         x = self.cnn(x)
-        print(x.shape)
+        # print(x.shape)
 
         batch_size, channels, width, height = x.size()
         #x = x.view(batch_size, height, width * channels)
         x = nn.functional.max_pool2d(x, [x.size(2), 1], stride=[x.size(2), 1], padding=[0, 1//2])
         x = x.permute(2, 0, 3, 1)[0]
-        print(x.shape)
+        #print(x.shape)
 
         x = self.blstm(x)[0]
 
-        x = self.fc1(self.dropout1(x))
+        # x = self.fc1(self.dropout1(x))
         x = self.fc2(self.dropout2(x))
 
         return x

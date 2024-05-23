@@ -18,10 +18,10 @@ class SiameseNetwork(nn.Module):
             
             if self.mode:
                 self.model.fc = nn.Sequential(nn.Identity())
-                self.fc = nn.Sequential(nn.Linear(in_features=1024, out_features=512), nn.ReLU(), 
+                self.fc = nn.Sequential(nn.Linear(in_features=1024, out_features=512), nn.ReLU(), nn.BatchNorm1d(256),
                                         nn.Linear(in_features=512, out_features=1))
             else:
-                self.model.fc = nn.Sequential(nn.Linear(in_features=512, out_features=256), nn.ReLU(), 
+                self.model.fc = nn.Sequential(nn.Linear(in_features=512, out_features=256), nn.ReLU(), nn.BatchNorm1d(256),
                                         nn.Linear(in_features=256, out_features=256))
         if model_name == "resnet18":
             self.model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)

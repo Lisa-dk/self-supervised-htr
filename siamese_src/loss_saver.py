@@ -13,11 +13,13 @@ class LossSaver:
         os.makedirs(self.directory, exist_ok=True)
         
 
-    def save_to_csv(self, epoch, loss):
+    def save_to_csv(self, epoch, loss, pos_dist, neg_dist):
         with open((self.directory + '/' + self.filename), "a") as file:
             loss = np.array2string(np.array(loss))
+            pos_dist = np.array2string(np.array(pos_dist))
+            neg_dist = np.array2string(np.array(neg_dist))
             
-            file.write(f"{epoch} {loss}\n")
+            file.write(f"{epoch} {loss} {pos_dist} {neg_dist} \n")
 
     def close(self):
         self.file.close()
