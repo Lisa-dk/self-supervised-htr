@@ -17,26 +17,26 @@ class Puigcerver(nn.Module):
             nn.LeakyReLU(negative_slope=0.01),
             nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2)),
 
-            # nn.Dropout(p=0.2),
+            nn.Dropout(p=0.2),
             nn.Conv2d(in_channels=32, out_channels=48, kernel_size=(3, 3), stride=(1, 1), padding="same", bias=False),
             nn.BatchNorm2d(48),
             nn.LeakyReLU(negative_slope=0.01),
             nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2)),
 
-            # nn.Dropout(p=0.2),
+            nn.Dropout(p=0.2),
             nn.Conv2d(in_channels=48, out_channels=64, kernel_size=(3, 3), stride=(1, 1), padding="same", bias=False),
             nn.BatchNorm2d(64),
             nn.LeakyReLU(negative_slope=0.01),
 
-            # nn.Dropout(p=0.2),
+            nn.Dropout(p=0.2),
             nn.Conv2d(in_channels=64, out_channels=80, kernel_size=(3, 3), stride=(1, 1), padding="same", bias=False),
             nn.BatchNorm2d(80),
             nn.LeakyReLU(negative_slope=0.01)
         )
         self.cnn.apply(self.weights_init)
 
-        self.blstm = nn.LSTM(input_size=80, hidden_size=256, num_layers=5, bidirectional=True, batch_first=True)#, dropout=0.5)
-        # self.dropout = nn.Dropout(0.5)
+        self.blstm = nn.LSTM(input_size=80, hidden_size=256, num_layers=5, bidirectional=True, batch_first=True, dropout=0.5)
+        self.dropout = nn.Dropout(0.5)
         # self.fc1 = nn.Linear(256, 512)
         self.fc = nn.Linear(512, d_model)
     

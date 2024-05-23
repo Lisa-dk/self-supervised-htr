@@ -102,13 +102,20 @@ if __name__ == "__main__":
         data_test = RIMES_data(data_test, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_test)
         test_loader = torch.utils.data.DataLoader(data_test, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
     elif args.dataset == "iam_gan":
-        data_train, data_valid, wid_train, wid_valid = read_rimes(dataset_path, args.max_word_len, synth=args.synth)
+        data_train, data_valid, data_test, wid_train, wid_valid, wid_test = read_rimes(dataset_path, args.max_word_len, synth=args.synth)
+        data_test = RIMES_data(data_test, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_test)
+        test_loader = torch.utils.data.DataLoader(data_test, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
     else:
         data_train, data_valid, data_test, oov_data_train, oov_data_valid, oov_data_test, wid_train, wid_valid, wid_test, oov_wid_train, oov_wid_valid, oov_wid_test = read_rimes(dataset_path, args.max_word_len, synth=args.synth)
-        oov_data_valid = RIMES_data(oov_data_valid, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_valid)
-        data_test = RIMES_data(data_test, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_test)
+        
+        oov_data_valid = RIMES_data(oov_data_valid, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=oov_wid_valid)
         oov_valid_loader = torch.utils.data.DataLoader(oov_data_valid, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
+        
+        data_test = RIMES_data(data_test, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_test)
         test_loader = torch.utils.data.DataLoader(data_test, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
+
+        oov_data_test = RIMES_data(oov_data_test, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=oov_wid_test)
+        oov_test_loader = torch.utils.data.DataLoader(oov_data_test, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
 
 
     data_train = RIMES_data(data_train, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_train)
@@ -123,12 +130,12 @@ if __name__ == "__main__":
         if not args.pretrained:
             
             if args.self_supervised:
-                htr_model = Puigcerver(input_size=input_size, d_model=tokenizer.vocab_size)
+                htr_model = Puigcerver_supervised(input_size=input_size, d_model=tokenizer.vocab_size)
                 if args.subset:
                     folder_name = f"{args.dataset}/{args.loss}-{args.vgg_layer}-{args.max_word_len}char-fold{args.fold}" if "vgg" in args.loss else f"{args.dataset}/{args.loss}-{args.max_word_len}char-fold{args.fold}"
                 else:
-                    folder_name =f"{args.dataset}/{args.loss}-{args.vgg_layer}-{args.max_word_len}char-adam-lr001-lin" if "vgg" in args.loss else f"{args.dataset}/{args.loss}-{args.max_word_len}char-adam-lr001"
-                model_name = f"./htr_models/{folder_name}/htr_model_self_supervised-{args.start_epoch - 1}.model"
+                    folder_name =f"{args.dataset}/{args.loss}-{args.vgg_layer}-{args.max_word_len}char-adam-lr001-pretr-synth" if "vgg" in args.loss else f"{args.dataset}/{args.loss}-{args.max_word_len}char-adam-lr001-pretr-synth"
+                model_name = f"./htr_models/{folder_name}/htr_model_self_supervised-{args.start_epoch}.model"
                 print(model_name)
                 
             else:
@@ -141,7 +148,7 @@ if __name__ == "__main__":
                 print("loading model: ", model_name)
                 htr_model.load_state_dict(torch.load(model_name)) #load
         else:
-            htr_model = Puigcerver_Dropout(input_size=input_size, d_model=tokenizer.vocab_size)
+            htr_model = Puigcerver_supervised(input_size=input_size, d_model=tokenizer.vocab_size)
             model_name = f"./htr_models/iam/ce/htr_model_supervised-40.model"
             folder_name = f"{args.dataset}/{args.loss}-{args.vgg_layer}-{args.max_word_len}chars-adam-lr001" if "vgg" in args.loss else f"{args.loss}-{args.max_word_len}chars-adam-lr001"
             if os.path.exists(model_name):
@@ -171,11 +178,11 @@ if __name__ == "__main__":
             data_loader = test_loader
         elif args.valid:
             data_loader = valid_loader
-
+        beam_search = False
        
-        folder_name = f"{args.dataset}/{args.loss}-{args.max_word_len}-chars-rms-lr0001"
+        folder_name = f"{args.dataset}_gan/{args.loss}-{args.vgg_layer}-{args.max_word_len}char-maxpool" if "vgg" in args.loss else f"{args.dataset}_gan/{args.loss}-{args.max_word_len}char-maxpool"
         if args.self_supervised:
-            htr_model = Puigcerver(input_size=input_size, d_model=tokenizer.vocab_size).cuda()
+            htr_model = Puigcerver_supervised(input_size=input_size, d_model=tokenizer.vocab_size).cuda()
             model_name = f"./htr_models/{folder_name}/htr_model_self_supervised-{args.start_epoch}.model"
             # from torchaudio, so uses a silent token
             beam_search_decoder = ctc_decoder(lexicon=None,
@@ -188,8 +195,8 @@ if __name__ == "__main__":
         
         else:
             #model_name = f"./htr_models/{folder_name}/htr_model_supervised-{args.start_epoch}.model"
-            htr_model = Puigcerver_Dropout(input_size=input_size, d_model=tokenizer.vocab_size).cuda()
-            model_name = f"./htr_models/iam/ctc/htr_model_supervised-ce-40.model"
+            htr_model = Puigcerver_supervised(input_size=input_size, d_model=tokenizer.vocab_size).cuda()
+            model_name = f"./htr_models/{folder_name}/htr_model_supervised-73.model"
             # from torchaudio, so uses a silent token
             if args.loss == "ctc":
                 beam_search_decoder = ctc_decoder(lexicon=None,
@@ -208,6 +215,7 @@ if __name__ == "__main__":
                 sil_token = "|"
                 )
         
+        print(model_name)
         if os.path.exists(model_name):
                 print("Loading model: ", model_name)
                 htr_model.load_state_dict(torch.load(model_name)) #load
@@ -220,7 +228,7 @@ if __name__ == "__main__":
         wer = 0
         total = 0
         for batch in tqdm(data_loader):
-            imgs, _, gt_labels = batch
+            imgs, _, gt_labels, _, _ = batch
             imgs = imgs.to(device)
             gt_labels = gt_labels.to(device)
 

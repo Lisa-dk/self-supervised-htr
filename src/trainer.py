@@ -31,7 +31,7 @@ class HTRtrainer(object):
         if self_supervised:
             self.gen_model = GenModel_FC(tokenizer.maxlen, tokenizer.vocab_size, tokenizer.PAD)
             # self.gen_model.load_state_dict(torch.load('./network/gen_model/gen_model-15all.model')) #load
-            self.gen_model.load_state_dict(torch.load('./network/gen_model/gen_model-25half.model'))
+            self.gen_model.load_state_dict(torch.load('./network/gen_model/gen_model-2750-25ch-corr-half.model'))
             self.gen_model.eval()
 
             for param in self.gen_model.parameters():
@@ -88,7 +88,7 @@ class HTRtrainer(object):
     def validate_self_supervised(self, batch):
         self.htr_model.eval()
         with torch.no_grad():
-            imgs, gen_imgs, gt_labels, _ = batch
+            imgs, gen_imgs, gt_labels, _, _ = batch
 
             imgs = imgs.to(self.device)
             gen_imgs = gen_imgs.to(self.device).squeeze(2)
@@ -143,7 +143,7 @@ class HTRtrainer(object):
     
     def train_batch_self_supervised(self, batch, epoch):
         self.htr_model.train()
-        imgs, gen_imgs, gt_labels, _ = batch
+        imgs, gen_imgs, gt_labels, _, _ = batch
         gt_labels_1hot = gt_labels.long()
         gt_labels_1hot = torch.nn.functional.one_hot(gt_labels_1hot, 56).float()
 
@@ -254,8 +254,6 @@ class HTRtrainer(object):
 
         self.optimizer.zero_grad()
 
-        print(imgs.shape)
-
         y_pred = self.htr_model(imgs)
         loss = self.loss.loss_func(y_pred, gt_labels)
 
@@ -307,8 +305,8 @@ class HTRtrainer(object):
                 avg_loss += loss
                 avg_cer += cer
                 avg_wer += wer
-                # if idx == 200:
-                #     break
+                if idx == 1:
+                    break
 
             n_train_batches = len(train_loader)
 
@@ -329,14 +327,14 @@ class HTRtrainer(object):
                 if self.loss_name == "htr":
                     loss, cer, wer, y_pred, y_true, syn_imgs, imgs, gt_htr_indc, synth_htr_indc = self.validate(batch)
                 else:
-                    loss, cer, wer, y_pred, y_true  = self.validate(batch)
+                    loss, cer, wer, y_pred, y_true, syn_imgs, imgs  = self.validate(batch)
                 # print(loss)
                 avg_loss += loss
                 avg_cer += cer
                 avg_wer += wer
-                # if idx == 200:
-                #     print(loss)
-                #     break
+                if idx == 1:
+                    # print(loss)
+                    break
 
             n_valid_batches = len(valid_loader)
             
@@ -351,7 +349,7 @@ class HTRtrainer(object):
             valid_saver.save_to_csv(epoch, avg_loss/n_valid_batches, avg_cer/n_valid_batches, avg_wer/n_valid_batches)
             print(f"mean validation loss epoch {epoch}: {avg_loss/len(valid_loader)}, cer: {avg_cer/len(valid_loader)}, wer: {avg_wer/len(valid_loader)}")
 
-            # self.save_images(epoch, syn_imgs.cpu().numpy(), imgs.cpu().numpy(), y_pred, y_true, plot=True) 
+            self.save_images(epoch, syn_imgs.cpu().numpy(), imgs.cpu().numpy(), y_pred, y_true, plot=True) 
             print("predictions last batch: ")
             for idx in range(len(y_pred)):
                 if self.loss_name == "htr":
@@ -376,14 +374,14 @@ class HTRtrainer(object):
                     if self.loss_name == "htr":
                         loss, cer, wer, y_pred, y_true, syn_imgs, imgs, gt_htr_indc, synth_htr_indc = self.validate(batch)
                     else:
-                        loss, cer, wer, y_pred, y_true  = self.validate(batch)
+                        loss, cer, wer, y_pred, y_true, syn_imgs, imgs  = self.validate(batch)
                     # print(loss)
                     avg_loss += loss
                     avg_cer += cer
                     avg_wer += wer
-                    # if idx == 200:
-                    #     print(loss)
-                    #     break
+                    if idx == 1:
+                        # print(loss)
+                        break
 
                 n_valid_batches = len(oov_valid_loader)
                 
@@ -396,9 +394,9 @@ class HTRtrainer(object):
                     print("learning rate: ", self.scheduler._last_lr)
                 
                 oov_valid_saver.save_to_csv(epoch, avg_loss/n_valid_batches, avg_cer/n_valid_batches, avg_wer/n_valid_batches)
-                print(f"mean oov validation loss epoch {epoch}: {avg_loss/len(valid_loader)}, cer: {avg_cer/len(valid_loader)}, wer: {avg_wer/len(valid_loader)}")
+                print(f"mean oov validation loss epoch {epoch}: {avg_loss/n_valid_batches}, cer: {avg_cer/n_valid_batches}, wer: {avg_wer/n_valid_batches}")
 
-                # self.save_images(epoch, syn_imgs.cpu().numpy(), imgs.cpu().numpy(), y_pred, y_true, plot=True) 
+                self.save_images(epoch, syn_imgs.cpu().numpy(), imgs.cpu().numpy(), y_pred, y_true, plot=True) 
                 print("predictions last batch: ")
                 for idx in range(len(y_pred)):
                     if self.loss_name == "htr":

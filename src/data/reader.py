@@ -4,7 +4,7 @@ import string
 def read_rimes(folder, max_word_len, synth):
     """Get data paths and labels (with max_word_len) of images in folder."""
     if "iam_gan" in folder:
-        partitions = ['train', 'valid']
+        partitions = ['train', 'valid', 'test']
     else:
         partitions = ['train', 'valid', 'test', 'oov_train', 'oov_valid', 'oov_test']
     dataset = {}
@@ -15,7 +15,8 @@ def read_rimes(folder, max_word_len, synth):
         dataset[partition] = []
         wid_dict[partition] = {}
 
-        text_file = os.path.join(folder, f"ground_truth_{partition}_filtered.txt")
+        text_file = os.path.join(folder, f"superHTR.ground_truth_{partition}_filtered.txt") if "iam_gan" in folder else os.path.join(folder, f"ground_truth_{partition}_filtered.txt")
+        # text_file = os.path.join(folder, f"ground_truth_{partition}_filtered.txt")
 
         with open(text_file, encoding='utf-8') as data_file:
             lines = data_file.read().splitlines()
@@ -67,12 +68,12 @@ def read_rimes(folder, max_word_len, synth):
     for wid in wid_dict['train'].keys():
         if wid in wid_dict['valid'].keys():
             wid_dict['valid'][wid] += wid_dict['train'][wid]
-        
-        if "iam_gan" in folder:
-            continue
 
         if wid in wid_dict['test'].keys():
             wid_dict['test'][wid] += wid_dict['train'][wid]
+
+        if "iam_gan" in folder:
+            continue
 
         if wid in wid_dict['oov_valid'].keys():
             wid_dict['oov_valid'][wid] += wid_dict['train'][wid]
@@ -84,7 +85,7 @@ def read_rimes(folder, max_word_len, synth):
             wid_dict['oov_test'][wid] += wid_dict['train'][wid]
 
     if "iam_gan" in folder:
-        return dataset['train'], dataset['valid'],  wid_dict['train'], wid_dict['valid']
+        return dataset['train'], dataset['valid'],  dataset['test'], wid_dict['train'], wid_dict['valid'], wid_dict['test']
     else:
         return dataset['train'], dataset['valid'], dataset['test'], dataset['oov_train'], dataset['oov_valid'], dataset['oov_test'], \
             wid_dict['train'], wid_dict['valid'], wid_dict['test'], wid_dict['oov_train'], wid_dict['oov_valid'], wid_dict['oov_test']
