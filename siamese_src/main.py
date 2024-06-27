@@ -99,7 +99,7 @@ if __name__ == "__main__":
         print(f"mean validation loss: {avg_loss/len(loader)} mean pos dist: {np.mean(pos_dists)} pm {np.std(pos_dists)} mean neg dist: {np.mean(neg_dists)} pm {np.std(neg_dists)} mean diff: {np.mean(diff)} pm {np.std(diff)}")
 
         t, p = ttest_ind(neg_dists, pos_dists) 
-        print(ttest_ind(neg_dists, pos_dists) )
+        print("df: ", ttest_ind(neg_dists, pos_dists).df )
         print("T statistic:", t)  
         print("p-value", p)
 
