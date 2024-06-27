@@ -49,19 +49,61 @@ class HTRtrainer(object):
         dir_path = './results/imgs/' + self.exp_folder + '/'
         os.makedirs(dir_path, exist_ok=True)
 
-        for idx in range(len(true_imgs)):
-            f, axarr = plt.subplots(1,2)
-            f.suptitle(str(labels[idx]))
-            print(pred_imgs[idx].shape)
-            print(pred_imgs[idx][0].shape)
-            axarr[0].imshow(true_imgs[idx][0], cmap='gray')
-            axarr[1].imshow(pred_imgs[idx][0], cmap='gray')
-            print(pred_labels[idx])
-            axarr[0].set_title("synthetic " + pred_labels[idx])
-            axarr[1].set_title("real")
-            plt.savefig(dir_path +  str(labels[idx]) + 'images_at_epoch_{:04d}.png'.format(epoch))
-            plt.show()
-            plt.close()
+        plt.rcParams['figure.figsize'] = [11, 5] # 7, 4 11, 5
+        fig, axes = plt.subplots(nrows=5, ncols=4)
+        rows = 5
+        cols = 4
+
+        print(true_imgs.shape)
+
+        idx = 0
+        for i in range(rows):
+            for j in range(cols):
+                if j == 0 or j == 2:
+                    img = 1. - ((true_imgs[idx][0] * 0.5) + 0.5)
+
+                    axes[i][j].axis("off")
+                    axes[i][j].set_title("'" + labels[idx] + "'")
+                    axes[i][j].imshow(img, cmap='gray')
+                if j == 1 or j == 3:
+                    img = 1. - ((pred_imgs[idx][0] * 0.5) + 0.5)
+
+                    axes[i][j].axis("off")
+                    axes[i][j].set_title("'" + pred_labels[idx] + "'")
+                    axes[i][j].imshow(img, cmap='gray')
+                    idx += 1
+                    
+
+        for j in range(cols):
+            if j == 0:
+                axes[0][j].set_title(f"Input \n \n '{labels[0]}'")
+            elif j == 2:
+                axes[0][j].set_title(f"Input \n \n '{labels[1]}'")
+            elif j == 1:
+                axes[0][j].set_title(f"Predicted \n \n '{pred_labels[0]}'")
+            elif j == 3:
+                axes[0][j].set_title(f"Predicted \n \n '{pred_labels[1]}'")
+        print(labels)
+        print(dir_path)
+        plt.savefig(dir_path + 'images_at_epoch_{:04d}.png'.format(epoch), dpi=300, bbox_inches="tight")
+        plt.show()
+        plt.close()
+        exit()
+
+
+        # for idx in range(len(true_imgs)):
+        #     f, axarr = plt.subplots(1,2)
+        #     f.suptitle(str(labels[idx]))
+        #     print(pred_imgs[idx].shape)
+        #     print(pred_imgs[idx][0].shape)
+        #     axarr[0].imshow(true_imgs[idx][0], cmap='gray')
+        #     axarr[1].imshow(pred_imgs[idx][0], cmap='gray')
+        #     print(pred_labels[idx])
+        #     axarr[0].set_title("synthetic " + pred_labels[idx])
+        #     axarr[1].set_title("real")
+        #     plt.savefig(dir_path +  str(labels[idx]) + 'images_at_epoch_{:04d}.png'.format(epoch))
+        #     plt.show()
+        #     plt.close()
 
         
     def evaluate(self, y_pred, gt_labels, show=False):
@@ -300,6 +342,7 @@ class HTRtrainer(object):
             avg_wer = 0
 
             for idx, batch in tqdm(enumerate(train_loader)):
+                break
                 loss, cer, wer, norm = self.train_batch(batch, epoch)
                 # print(loss)
                 avg_loss += loss
@@ -315,9 +358,9 @@ class HTRtrainer(object):
             dir = f"./htr_models/{self.exp_folder}/"
             os.makedirs(dir, exist_ok=True)
             # TODO: save and load optimizer state
-            torch.save(self.htr_model.state_dict(), f"{dir}htr_model_{self.mode}-{epoch}.model")
+            # torch.save(self.htr_model.state_dict(), f"{dir}htr_model_{self.mode}-{epoch}.model")
 
-            print(f"mean train loss epoch {epoch}: {avg_loss/len(train_loader)}, cer: {avg_cer/len(train_loader)}, wer: {avg_wer/len(train_loader)} last norm: {norm}")
+            # print(f"mean train loss epoch {epoch}: {avg_loss/len(train_loader)}, cer: {avg_cer/len(train_loader)}, wer: {avg_wer/len(train_loader)} last norm: {norm}")
 
             avg_loss = 0
             avg_cer = 0
@@ -325,14 +368,14 @@ class HTRtrainer(object):
 
             for idx, batch in tqdm(enumerate(valid_loader)):
                 if self.loss_name == "htr":
-                    loss, cer, wer, y_pred, y_true, syn_imgs, imgs, gt_htr_indc, synth_htr_indc = self.validate(batch)
+                    loss, cer, wer, y_pred, y_true, imgs, syn_imgs, gt_htr_indc, synth_htr_indc = self.validate(batch)
                 else:
-                    loss, cer, wer, y_pred, y_true, syn_imgs, imgs  = self.validate(batch)
+                    loss, cer, wer, y_pred, y_true, imgs, syn_imgs,  = self.validate(batch)
                 # print(loss)
                 avg_loss += loss
                 avg_cer += cer
                 avg_wer += wer
-                if idx == 1:
+                if idx == 6:
                     # print(loss)
                     break
 
@@ -379,7 +422,7 @@ class HTRtrainer(object):
                     avg_loss += loss
                     avg_cer += cer
                     avg_wer += wer
-                    if idx == 1:
+                    if idx == 2:
                         # print(loss)
                         break
 
@@ -393,7 +436,7 @@ class HTRtrainer(object):
                     # print("learning rate: ", self.scheduler.get_last_lr())
                     print("learning rate: ", self.scheduler._last_lr)
                 
-                oov_valid_saver.save_to_csv(epoch, avg_loss/n_valid_batches, avg_cer/n_valid_batches, avg_wer/n_valid_batches)
+                # oov_valid_saver.save_to_csv(epoch, avg_loss/n_valid_batches, avg_cer/n_valid_batches, avg_wer/n_valid_batches)
                 print(f"mean oov validation loss epoch {epoch}: {avg_loss/n_valid_batches}, cer: {avg_cer/n_valid_batches}, wer: {avg_wer/n_valid_batches}")
 
                 self.save_images(epoch, syn_imgs.cpu().numpy(), imgs.cpu().numpy(), y_pred, y_true, plot=True) 

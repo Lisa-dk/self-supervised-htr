@@ -32,6 +32,7 @@ if __name__ == "__main__":
     parser.add_argument("--self_supervised", action="store_true", default=False)
     parser.add_argument("--subset" , action="store_true", default=False)
     parser.add_argument("--synth", action="store_true", default=False)
+    parser.add_argument("--oov", action="store_true", default=False)
     parser.add_argument("--fold" , type=int, default=0)
 
     parser.add_argument("--preproc", action="store_true", default=False)
@@ -42,15 +43,16 @@ if __name__ == "__main__":
     parser.add_argument("--beam_search", action="store_true", default=False)
     parser.add_argument("--test_supervised", action="store_true", default=False)
 
-    parser.add_argument("--epochs", type=int, default=100)
+    parser.add_argument("--epochs", type=int, default=500)
     parser.add_argument('--start_epoch', type=int, default=0)
 
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--loss", type=str, default="ctc")
     parser.add_argument("--pretrained", action="store_true", default=False)
 
-    parser.add_argument("--vgg_layer", type=int, default=9)
+    parser.add_argument("--vgg_layer", type=int, default=16)
     parser.add_argument("--max_word_len", type=int, default=max_text_length)
+    parser.add_argument("--lr", type=float, default=0.001)
 
     args = parser.parse_args()
 
@@ -108,6 +110,9 @@ if __name__ == "__main__":
     else:
         data_train, data_valid, data_test, oov_data_train, oov_data_valid, oov_data_test, wid_train, wid_valid, wid_test, oov_wid_train, oov_wid_valid, oov_wid_test = read_rimes(dataset_path, args.max_word_len, synth=args.synth)
         
+        oov_data_train = RIMES_data(oov_data_train, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=oov_wid_train)
+        oov_train_loader = torch.utils.data.DataLoader(oov_data_train, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
+        
         oov_data_valid = RIMES_data(oov_data_valid, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=oov_wid_valid)
         oov_valid_loader = torch.utils.data.DataLoader(oov_data_valid, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
         
@@ -118,10 +123,13 @@ if __name__ == "__main__":
         oov_test_loader = torch.utils.data.DataLoader(oov_data_test, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
 
 
-    data_train = RIMES_data(data_train, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_train)
+    if args.oov:
+        train_loader = oov_train_loader
+    else:
+        data_train = RIMES_data(data_train, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_train)
+        train_loader = torch.utils.data.DataLoader(data_train, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=4)
+    
     data_valid = RIMES_data(data_valid, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_valid)
-
-    train_loader = torch.utils.data.DataLoader(data_train, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=4)
     valid_loader = torch.utils.data.DataLoader(data_valid, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
     
 
@@ -134,15 +142,28 @@ if __name__ == "__main__":
                 if args.subset:
                     folder_name = f"{args.dataset}/{args.loss}-{args.vgg_layer}-{args.max_word_len}char-fold{args.fold}" if "vgg" in args.loss else f"{args.dataset}/{args.loss}-{args.max_word_len}char-fold{args.fold}"
                 else:
-                    folder_name =f"{args.dataset}/{args.loss}-{args.vgg_layer}-{args.max_word_len}char-adam-lr001-pretr-synth" if "vgg" in args.loss else f"{args.dataset}/{args.loss}-{args.max_word_len}char-adam-lr001-pretr-synth"
+                    folder_name =f"{args.dataset}/{args.loss}-{args.vgg_layer}-{args.max_word_len}char-gen3000-adam-lr0003-lrplat-pretr" if "vgg" in args.loss else f"{args.dataset}/{args.loss}-{args.max_word_len}char-gen3000-adam-lr0003-lrplat-pretr"
+                
+                if args.synth:
+                    folder_name = folder_name + "-synth"
+                
+                if args.oov:
+                    folder_name = folder_name + "-oov"
+                
                 model_name = f"./htr_models/{folder_name}/htr_model_self_supervised-{args.start_epoch}.model"
                 print(model_name)
                 
             else:
                 htr_model = Puigcerver_supervised(input_size=input_size, d_model=tokenizer.vocab_size)
-                folder_name = f"{args.dataset}/{args.loss}-{args.max_word_len}-chars-rms-lr0001-dense"
-                model_name = f"./htr_models/{folder_name}/htr_model_supervised-{args.start_epoch}.model"
+                folder_name = f"{args.dataset}/{args.loss}-{args.max_word_len}char-gen3000-maxpool-synth"
+                model_name = f"./htr_models/{folder_name}/htr_model_supervised-{args.start_epoch - 1}.model"
                 print(model_name)
+            
+            # if args.synth:
+            #     folder_name = folder_name + "-synth"
+            
+            # if args.oov:
+            #     folder_name = folder_name + "-oov"
 
             if os.path.exists(model_name):
                 print("loading model: ", model_name)
@@ -172,15 +193,15 @@ if __name__ == "__main__":
             trainer.train_model(train_loader=train_loader, valid_loader=valid_loader, oov_valid_loader=None, epochs=(args.start_epoch, args.epochs))
         else:
             trainer.train_model(train_loader=train_loader, valid_loader=valid_loader, oov_valid_loader=oov_valid_loader, epochs=(args.start_epoch, args.epochs))
-
+    
     elif args.test or args.valid:
         if args.test:
             data_loader = test_loader
         elif args.valid:
-            data_loader = valid_loader
+            data_loader = oov_valid_loader
         beam_search = False
        
-        folder_name = f"{args.dataset}_gan/{args.loss}-{args.vgg_layer}-{args.max_word_len}char-maxpool" if "vgg" in args.loss else f"{args.dataset}_gan/{args.loss}-{args.max_word_len}char-maxpool"
+        folder_name = f"{args.dataset}/{args.loss}-{args.vgg_layer}-{args.max_word_len}char-gen3000-adam-lr0003-lrplat-pretr-synth-oov" if "vgg" in args.loss else f"{args.dataset}/{args.loss}-{args.max_word_len}char-gen3000-maxpool-synth"
         if args.self_supervised:
             htr_model = Puigcerver_supervised(input_size=input_size, d_model=tokenizer.vocab_size).cuda()
             model_name = f"./htr_models/{folder_name}/htr_model_self_supervised-{args.start_epoch}.model"
@@ -194,9 +215,10 @@ if __name__ == "__main__":
             )
         
         else:
+            folder_name = f"{args.dataset}/{args.loss}-{args.max_word_len}char-maxpool"
             #model_name = f"./htr_models/{folder_name}/htr_model_supervised-{args.start_epoch}.model"
             htr_model = Puigcerver_supervised(input_size=input_size, d_model=tokenizer.vocab_size).cuda()
-            model_name = f"./htr_models/{folder_name}/htr_model_supervised-73.model"
+            model_name = f"./htr_models/{folder_name}/htr_model_supervised-{args.start_epoch}.model"
             # from torchaudio, so uses a silent token
             if args.loss == "ctc":
                 beam_search_decoder = ctc_decoder(lexicon=None,

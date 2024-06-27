@@ -12,6 +12,7 @@ from data.data_loader import IAM_data
 from network.model import SiameseNetwork
 from tqdm import tqdm
 from trainer import Trainer
+from scipy.stats import ttest_ind
 
 
 if __name__ == "__main__":
@@ -35,7 +36,7 @@ if __name__ == "__main__":
 
     dataset_path = os.path.join("..", "data", "iam_gan", "words")
 
-    os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+    # os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     input_size = (64, 216, 1)
@@ -60,7 +61,7 @@ if __name__ == "__main__":
     model = SiameseNetwork(model_name=args.model, edisdist=args.editdistance)
     # model.load_state_dict(torch.load(f'./models/results/{args.model}-19.model'))
     print(model.model)
-    epochs = (0, 30)
+    epochs = (args.start_epoch, args.epochs)
 
     if args.train:
         if args.editdistance:
@@ -70,8 +71,12 @@ if __name__ == "__main__":
         trainer.train_model(train_loader, valid_loader, epochs)
 
     elif args.test or args.valid:
-        model.load_state_dict(torch.load(f'./models/results/{args.model}-RMS-24.model'))
+        model.load_state_dict(torch.load(f'./models/final/{args.model}-RMS-17.model'))
         model.eval()
+
+        for param in model.parameters():
+            param.requires_grad = False
+            
         trainer =  Trainer(model, device, "./results/", args.model + "-RMS", args.editdistance)
 
         if args.test:
@@ -92,4 +97,9 @@ if __name__ == "__main__":
 
         diff = [neg_dists[i] - pos_dists[i] for i in range(len(neg_dists))]
         print(f"mean validation loss: {avg_loss/len(loader)} mean pos dist: {np.mean(pos_dists)} pm {np.std(pos_dists)} mean neg dist: {np.mean(neg_dists)} pm {np.std(neg_dists)} mean diff: {np.mean(diff)} pm {np.std(diff)}")
+
+        t, p = ttest_ind(neg_dists, pos_dists) 
+        print(ttest_ind(neg_dists, pos_dists) )
+        print("T statistic:", t)  
+        print("p-value", p)
 
