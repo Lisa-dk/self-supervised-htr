@@ -27,9 +27,6 @@ class SiameseNetwork(nn.Module):
             self.model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
             self.model.fc = nn.Sequential(nn.Linear(in_features=512, out_features=256), nn.ReLU(), 
                                         nn.Linear(in_features=256, out_features=256))
-        # self.vgg16.classifier = self.vgg16.classifier[:] # remove output layer
-        # self.fc = nn.Sequential(nn.Linear(in_features=4096*2, out_features=2048), nn.ReLU(), nn.Linear(in_features=2048, out_features=1))
-        # self.sigmoid = nn.Sigmoid()
     
     def forward_pass(self, x):
         x = self.model.features(x)
@@ -48,7 +45,3 @@ class SiameseNetwork(nn.Module):
             return x
         else:
             return x1, x2
-        # x = torch.cat((x1, x2), dim=1)
-        # x = self.fc(x)
-        # x = torch.flatten(x)
-        # return self.sigmoid(x)

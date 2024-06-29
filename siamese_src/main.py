@@ -34,20 +34,16 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    dataset_path = os.path.join("..", "data", "iam_gan", "words")
-
-    # os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
     input_size = (64, 216, 1)
     
-    # get data paths and labels (path, label, wid)
+    # Get data paths and labels (path, label, wid)
+    dataset_path = os.path.join("..", "data", "iam_gan", "words")
     data_train, data_valid, data_test = read_data(dataset_path)
 
     print(data_train[0])
     print(data_valid[0])
     print(data_test[0])
-
 
     data_train = IAM_data(data_train)
     data_valid = IAM_data(data_valid)
@@ -59,8 +55,8 @@ if __name__ == "__main__":
     test_loader = torch.utils.data.DataLoader(data_test, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=num_workers)
     
     model = SiameseNetwork(model_name=args.model, edisdist=args.editdistance)
-    # model.load_state_dict(torch.load(f'./models/results/{args.model}-19.model'))
     print(model.model)
+    
     epochs = (args.start_epoch, args.epochs)
 
     if args.train:
@@ -71,7 +67,7 @@ if __name__ == "__main__":
         trainer.train_model(train_loader, valid_loader, epochs)
 
     elif args.test or args.valid:
-        model.load_state_dict(torch.load(f'./models/final/{args.model}-RMS-17.model'))
+        model.load_state_dict(torch.load(f'./models/results/{args.model}-RMS-17.model'))
         model.eval()
 
         for param in model.parameters():
@@ -97,7 +93,8 @@ if __name__ == "__main__":
 
         diff = [neg_dists[i] - pos_dists[i] for i in range(len(neg_dists))]
         print(f"mean validation loss: {avg_loss/len(loader)} mean pos dist: {np.mean(pos_dists)} pm {np.std(pos_dists)} mean neg dist: {np.mean(neg_dists)} pm {np.std(neg_dists)} mean diff: {np.mean(diff)} pm {np.std(diff)}")
-
+        
+        # Two-tailed t-test
         t, p = ttest_ind(neg_dists, pos_dists) 
         print("df: ", ttest_ind(neg_dists, pos_dists).df )
         print("T statistic:", t)  
