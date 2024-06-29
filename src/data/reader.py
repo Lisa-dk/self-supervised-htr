@@ -1,7 +1,7 @@
 import os
 import string
 
-def read_rimes(folder, max_word_len, synth):
+def read_iam(folder, max_word_len, synth):
     """Get data paths and labels (with max_word_len) of images in folder."""
     if "iam_gan" in folder:
         partitions = ['train', 'valid', 'test']

@@ -7,12 +7,12 @@ import time
 import argparse
 from data.tokenizer import Tokenizer
 import string
-from data.reader import read_rimes, read_iam_subset
+from data.reader import read_iam, read_iam_subset
 import data.preproc
 # from data.preproc import preproc_iam, preproc_rimes
-from network.models import Puigcerver, Puigcerver_Dropout, Puigcerver_supervised
+from network.models import Puigcerver, Puigcerver_supervised
 from trainer import HTRtrainer
-from data.data_loader import RIMES_data
+from data.data_loader import IAM_data
 import editdistance
 from torchaudio.models.decoder import ctc_decoder
 from tqdm import tqdm
@@ -101,35 +101,35 @@ if __name__ == "__main__":
     if args.subset:
         print("Fold", args.fold)
         data_train, data_valid, data_test, wid_train, wid_valid, wid_test = read_iam_subset(dataset_path, args.max_word_len, n_fold=args.fold, synth=args.synth)
-        data_test = RIMES_data(data_test, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_test)
+        data_test = IAM_data(data_test, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_test)
         test_loader = torch.utils.data.DataLoader(data_test, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
     elif args.dataset == "iam_gan":
-        data_train, data_valid, data_test, wid_train, wid_valid, wid_test = read_rimes(dataset_path, args.max_word_len, synth=args.synth)
-        data_test = RIMES_data(data_test, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_test)
+        data_train, data_valid, data_test, wid_train, wid_valid, wid_test = read_iam(dataset_path, args.max_word_len, synth=args.synth)
+        data_test = IAM_data(data_test, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_test)
         test_loader = torch.utils.data.DataLoader(data_test, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
     else:
-        data_train, data_valid, data_test, oov_data_train, oov_data_valid, oov_data_test, wid_train, wid_valid, wid_test, oov_wid_train, oov_wid_valid, oov_wid_test = read_rimes(dataset_path, args.max_word_len, synth=args.synth)
+        data_train, data_valid, data_test, oov_data_train, oov_data_valid, oov_data_test, wid_train, wid_valid, wid_test, oov_wid_train, oov_wid_valid, oov_wid_test = read_iam(dataset_path, args.max_word_len, synth=args.synth)
         
-        oov_data_train = RIMES_data(oov_data_train, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=oov_wid_train)
+        oov_data_train = IAM_data(oov_data_train, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=oov_wid_train)
         oov_train_loader = torch.utils.data.DataLoader(oov_data_train, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
         
-        oov_data_valid = RIMES_data(oov_data_valid, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=oov_wid_valid)
+        oov_data_valid = IAM_data(oov_data_valid, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=oov_wid_valid)
         oov_valid_loader = torch.utils.data.DataLoader(oov_data_valid, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
         
-        data_test = RIMES_data(data_test, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_test)
+        data_test = IAM_data(data_test, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_test)
         test_loader = torch.utils.data.DataLoader(data_test, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
 
-        oov_data_test = RIMES_data(oov_data_test, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=oov_wid_test)
+        oov_data_test = IAM_data(oov_data_test, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=oov_wid_test)
         oov_test_loader = torch.utils.data.DataLoader(oov_data_test, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
 
 
     if args.oov:
         train_loader = oov_train_loader
     else:
-        data_train = RIMES_data(data_train, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_train)
+        data_train = IAM_data(data_train, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_train)
         train_loader = torch.utils.data.DataLoader(data_train, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=4)
     
-    data_valid = RIMES_data(data_valid, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_valid)
+    data_valid = IAM_data(data_valid, input_size=input_size, tokenizer=tokenizer, num_images=num_style_imgs, wids=wid_valid)
     valid_loader = torch.utils.data.DataLoader(data_valid, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
     
 

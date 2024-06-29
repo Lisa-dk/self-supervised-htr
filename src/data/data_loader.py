@@ -6,7 +6,7 @@ from torchvision import transforms
 import random
 import torch
 
-class RIMES_data(D.Dataset):
+class IAM_data(D.Dataset):
     def __init__(self, paths, input_size, tokenizer, num_images, wids):
         self.img_paths = paths
         self.input_size = input_size
