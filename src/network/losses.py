@@ -99,7 +99,7 @@ class Loss:
     def ce_loss(self, y_pred, gt_labels):
         gt_labels_1hot = gt_labels.long()
         gt_labels_1hot = torch.nn.functional.one_hot(gt_labels_1hot, self.tokenizer.vocab_size).float()
-
+        
         y_pred = y_pred.view(-1, self.tokenizer.vocab_size)
         gt_labels_1hot = gt_labels_1hot.view(-1, self.tokenizer.vocab_size)
 
@@ -153,28 +153,14 @@ class Loss:
         gt_imgs = (gt_imgs - (-1.)) / 2.    # 0-1
         synth_imgs = (synth_imgs - (-1.)) / 2.
 
-        # print(torch.min(gt_imgs), torch.max(gt_imgs.sum(dim=1)))
-        
         vertical_profile = gt_imgs.sum(dim=1) / synth_imgs.shape[-2]
         synth_vertical_profile = synth_imgs.squeeze(1).sum(dim=1) / synth_imgs.shape[-2]
 
         return torch.mean((vertical_profile - synth_vertical_profile) ** 2.)      
     
     def htr_loss(self, synth_imgs, gt_imgs):
-        # gt_feats =  self.iam_model.cnn(gt_imgs.squeeze(0).unsqueeze(1))
-        # batch_size, channels, width, height = gt_feats.size()
-        # gt_feats = gt_feats.view(batch_size, height, width * channels)
-        # gt_feats, _ = self.iam_model.blstm(gt_feats)
-        # gt_feats = self.iam_model.fc1(gt_feats)
-        # gt_feats = self.iam_model.fc2(gt_feats)
-
         gt_feats = self.iam_model(gt_imgs.squeeze(0).unsqueeze(1))
         gt_feats = nn.functional.softmax(gt_feats, 2)
-        # y_pred_max, _ = torch.max(gt_feats, dim=2, keepdim=True)
-        # y_pred_max = gt_feats / y_pred_max
-
-        # mask = (y_pred_max >= 1.0).float()
-        # y_pred_max = y_pred_max * mask
 
         y_pred_max_flat = gt_feats.view(-1, self.tokenizer.vocab_size)
 
@@ -208,10 +194,5 @@ class Loss:
         gt_input = torch.stack([gt_imgs, gt_imgs, gt_imgs], dim=1).squeeze(2)
         synth_input = torch.stack([synth_imgs, synth_imgs, synth_imgs], dim=1).squeeze(2)
 
-        # print(gt_input.shape, synth_input.shape)
-
         feats1, feats2 = self.feat_model(gt_input, synth_input)
         return torch.mean(nn.functional.pairwise_distance(feats1, feats2))
-
-
-
