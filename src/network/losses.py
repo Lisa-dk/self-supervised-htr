@@ -84,7 +84,7 @@ class Loss:
         
         elif loss_input.lower() == "siamese":
             self.feat_model = SiameseNetwork("resnet34", False)
-            self.feat_model.load_state_dict(torch.load('../src/network/sia_model/resnet34-RMS-6.model'))
+            self.feat_model.load_state_dict(torch.load('../src/network/sia_model/resnet34-RMS-17.model'))
             self.feat_model.to(self.device)
             self.feat_model.eval()
 
