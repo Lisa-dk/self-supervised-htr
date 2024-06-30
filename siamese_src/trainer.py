@@ -13,11 +13,9 @@ class Trainer(object):
         super(Trainer, self).__init__()
         self.model = model.to(device)
 
-        # self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.00001)
         self.optimizer = torch.optim.RMSprop(self.model.parameters(), lr=0.0001)
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, factor=0.1, patience=2, verbose=True)
 
-        # self.loss = 
         self.exp_folder = folder_name
         self.device = device
         self.model_name = model_name
@@ -47,8 +45,6 @@ class Trainer(object):
 
         if not self.mode:
             feats1, feats2 = self.model(imgs1, imgs2)
-            # out = self.model(imgs1, imgs2.unsqueeze(1))
-
             l2_dist = nn.functional.pairwise_distance(feats1, feats2)
 
             loss = self.contrastive_loss(l2_dist, labels)
@@ -57,9 +53,6 @@ class Trainer(object):
             l2_dist = nn.functional.pairwise_distance(pred_edit, dist)
             loss = torch.mean(nn.functional.pairwise_distance(pred_edit, dist))
 
-        # bce = nn.BCELoss()
-        # loss = bce(out, labels)
-        # print(labels, torch.sum(labels))
         mean_pos_dists = torch.mean(labels * l2_dist)
         mean_neg_dists = torch.mean((1. - labels) * l2_dist)
 
@@ -79,8 +72,6 @@ class Trainer(object):
 
         if not self.mode:
             feats1, feats2 = self.model(imgs1, imgs2)
-            # out = self.model(imgs1, imgs2.unsqueeze(1))
-
             l2_dist = nn.functional.pairwise_distance(feats1, feats2)
 
             loss = self.contrastive_loss(l2_dist, labels)
@@ -88,9 +79,6 @@ class Trainer(object):
             pred_edit = self.model(imgs1, imgs2)
             l2_dist = nn.functional.pairwise_distance(pred_edit, dist)
             loss = torch.mean(nn.functional.pairwise_distance(pred_edit, dist))
-
-        # bce = nn.BCELoss()
-        # loss = bce(out, labels)
 
         loss.backward()
 
@@ -118,7 +106,6 @@ class Trainer(object):
             train_saver = LossSaver(f"{self.exp_folder}-{self.model_name}", "train", 16)
             valid_saver = LossSaver(f"{self.exp_folder}-{self.model_name}", "valid", 16)
         s_epoch, end_epoch = epochs
-        # torch.autograd.set_detect_anomaly(True)
 
         patience = 5
         pat_count = 0
@@ -133,7 +120,6 @@ class Trainer(object):
             neg_dists = 0
             for idx, batch in tqdm(enumerate(train_loader), total=len(train_loader)):
                 loss, norm, pos_dist, neg_dist = self.train_batch(batch)
-                # print(loss)
                 avg_loss += loss
                 pos_dists += pos_dist
                 neg_dists += neg_dist
@@ -142,7 +128,6 @@ class Trainer(object):
             train_saver.save_to_csv(epoch, avg_loss/len(train_loader), pos_dists/len(train_loader), neg_dists/len(train_loader))
             dir = f"./models/{self.exp_folder}/"
             os.makedirs(dir, exist_ok=True)
-            # TODO: save and load optimizer state
             torch.save(self.model.state_dict(), f"{dir}{self.model_name}-{epoch}.model")
             print(f"mean train loss epoch {epoch}: {avg_loss/len(train_loader)} mean l2-distance pos: {pos_dists/len(train_loader)} mean l2-distance neg: {neg_dists/len(train_loader)} norm: {norm}")
 
@@ -151,7 +136,6 @@ class Trainer(object):
             neg_dists_ = []
             for idx, batch in tqdm(enumerate(valid_loader)):
                 loss, img1, img2, labels, pos_dist, neg_dist = self.validate(batch)
-                # print(loss)
                 avg_loss += loss
                 pos_dists_.append(pos_dist)
                 neg_dists_.append(neg_dist)
@@ -169,9 +153,3 @@ class Trainer(object):
             
             if pat_count == patience:
                 break
-
-            # for idx in range(len(img1)):
-            #     f, axarr = plt.subplots(1,2)
-            #     axarr[0].imshow(img1[idx][0], cmap='gray')
-            #     axarr[1].imshow(img2[idx][0], cmap='gray')
-            #     plt.show()

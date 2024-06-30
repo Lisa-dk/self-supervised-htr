@@ -1,23 +1,23 @@
 import os, sys
 import torch
-import glob
 from torch import optim
 import numpy as np
-import time
 import argparse
-from data.tokenizer import Tokenizer
 import string
-from data.reader import read_iam, read_iam_subset
-import data.preproc
-# from data.preproc import preproc_iam, preproc_rimes
-from network.models import Puigcerver, Puigcerver_supervised
-from trainer import HTRtrainer
-from data.data_loader import IAM_data
 import editdistance
+
 from torchaudio.models.decoder import ctc_decoder
 from tqdm import tqdm
-from network.gen_model.gen_model import GenModel_FC
 from sklearn.model_selection import StratifiedKFold
+
+import data.preproc
+from data.tokenizer import Tokenizer
+from data.reader import read_iam, read_iam_subset
+from data.data_loader import IAM_data
+from network.models import Puigcerver, Puigcerver_supervised
+from network.gen_model.gen_model import GenModel_FC
+from trainer import HTRtrainer
+
 sys.path.append('../../')
 sys.path.append('../src')
 sys.path.append('../../GANwriting')

@@ -44,15 +44,6 @@ def resize(img, input_size):
 
     return target
 
-# def normalize(img):
-#     imgs = np.asarray(imgs).astype(np.float32)
-#     _, h, w = img.shape
-
-#     m, s = cv2.meanStdDev(img)
-#     img = img - m[0][0]
-#     img = img / s[0][0] if s[0][0] > 0 else img
-#     return img
-
 def normalize(img):
     img = 1. - (img / 255.) # 0-255 -> 0-1
 
@@ -237,13 +228,6 @@ def main():
     print(path_to)
     os.makedirs(path_to, exist_ok=True)
     preproc_rimes(path_from, path_to)
-
-    # try:
-    #     preproc_rimes(path_from, path_to)
-    #     getattr(f"preproc_{dataset_name}")(path_from, path_to)
-    # except:
-    #     print("dataset processing not implemented")
-
 
 
 if __name__ == "__main__":

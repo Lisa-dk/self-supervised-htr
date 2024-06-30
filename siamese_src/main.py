@@ -1,18 +1,17 @@
 import os, sys
 import torch
-import glob, cv2
 from torch import optim
 import numpy as np
-import time
 import argparse
 import string
-from data.reader import read_data
+from tqdm import tqdm
+from scipy.stats import ttest_ind
+
 import data.preproc
+from data.reader import read_data
 from data.data_loader import IAM_data
 from network.model import SiameseNetwork
-from tqdm import tqdm
 from trainer import Trainer
-from scipy.stats import ttest_ind
 
 
 if __name__ == "__main__":
