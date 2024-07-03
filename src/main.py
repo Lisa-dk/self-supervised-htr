@@ -197,9 +197,9 @@ if __name__ == "__main__":
         
         # Model training
         if args.dataset == "iam_gan" or args.subset:
-            trainer.train_model(train_loader=train_loader, valid_loader=valid_loader, oov_valid_loader=None, epochs=(args.start_epoch, args.epochs))
+            trainer.train_model(train_loader=train_loader, valid_loader=valid_loader, oov_valid_loader=None, epochs=(args.start_epoch, args.epochs), oov=args.oov)
         else:
-            trainer.train_model(train_loader=train_loader, valid_loader=valid_loader, oov_valid_loader=oov_valid_loader, epochs=(args.start_epoch, args.epochs))
+            trainer.train_model(train_loader=train_loader, valid_loader=valid_loader, oov_valid_loader=oov_valid_loader, epochs=(args.start_epoch, args.epochs), oov=args.oov)
     
     elif args.test or args.valid:
         if args.test:
