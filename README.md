@@ -12,3 +12,5 @@ This repository then contains the following:
 - The code for the creation of the new data splits (and their recreation with synthetic images): IAM-GEN, IAM-HTR, IAM-GEN-SIA as described in the thesis.
 
 The structure is based on the implementation of [HTR-Flor](https://ieeexplore.ieee.org/document/9266005)
+
+The full thesis is available at [https://fse.studenttheses.ub.rug.nl/33045/]{https://fse.studenttheses.ub.rug.nl/33045/}
