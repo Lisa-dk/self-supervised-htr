@@ -13,4 +13,4 @@ This repository then contains the following:
 
 The structure is based on the implementation of [HTR-Flor](https://ieeexplore.ieee.org/document/9266005)
 
-The full thesis is available [here]{https://fse.studenttheses.ub.rug.nl/33045/1/mAI2024KoopmansLD.pdf}
+The full thesis is available [here](https://fse.studenttheses.ub.rug.nl/33045/1/mAI2024KoopmansLD.pdf)
